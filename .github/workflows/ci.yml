@@ -36,10 +36,13 @@ jobs:
     - name: Extract binaries from docker image
       run: |
         mkdir -p $(pwd)/build
-        docker run --rm -v $(pwd)/build:/build retro-go:latest sh -c "cp /app/build/*t-deck*.bin /build/ 2>/dev/null || cp /app/*t-deck*.bin /build/ 2>/dev/null || cp /app/build/*.bin /build/ 2>/dev/null || cp /app/*.bin /build/ 2>/dev/null || echo 'No bin found'"
+        # Denne kommando gennemsøger alle undermapper i containeren efter .bin filer og kopierer dem ud
+        docker run --rm -v $(pwd)/build:/out retro-go:latest sh -c "find /app -name '*.bin' -exec cp {} /out/ \;"
+        # Viser hvad vi har fundet i loggen, så vi kan se det
+        ls -la $(pwd)/build
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: binaries
-        path: build/*
+        path: build/
