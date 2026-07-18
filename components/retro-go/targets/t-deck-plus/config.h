@@ -17,8 +17,8 @@
 // Board-specific
 #define T_DECK_BOARD_POWER          GPIO_NUM_10
 #define T_DECK_RADIO_CS             GPIO_NUM_9
-#define T_DECK_KBD_ADDRESS          0x55
-#define T_DECK_KBD_MODE_RAW_CMD     0x03
+#define T_DECK_KBD_ADDRESS          0x20
+#define T_DECK_KBD_MODE_RAW_CMD     0x00
 
 #define RG_CUSTOM_PLATFORM_INIT()                             \
     gpio_set_direction(T_DECK_BOARD_POWER, GPIO_MODE_OUTPUT); \
@@ -85,7 +85,7 @@
 #define RG_RECOVERY_BTN             RG_KEY_MENU
 
 // Battery
-#define RG_BATTERY_DRIVER           1
+#define RG_BATTERY_DRIVER           0
 #define RG_BATTERY_ADC_UNIT         ADC_UNIT_1
 #define RG_BATTERY_ADC_CHANNEL      ADC1_CHANNEL_3
 #define RG_BATTERY_CALC_PERCENT(raw) (((raw) * 2.f - 3500.f) / (4200.f - 3500.f) * 100.f)
@@ -97,7 +97,7 @@
 #define RG_GPIO_I2C_SCL             GPIO_NUM_8
 
 // SPI Display
-#define RG_GPIO_LCD_MISO            GPIO_NUM_38
+#define RG_GPIO_LCD_MISO            GPIO_NUM_NC
 #define RG_GPIO_LCD_MOSI            GPIO_NUM_41
 #define RG_GPIO_LCD_CLK             GPIO_NUM_40
 #define RG_GPIO_LCD_CS              GPIO_NUM_12
@@ -112,5 +112,7 @@
 
 // External I2S DAC
 #define RG_GPIO_SND_I2S_BCK         GPIO_NUM_7
-#define RG_GPIO_SND_I2S_WS          GPIO_NUM_5
-#define RG_GPIO_SND_I2S_DATA        GPIO_NUM_6
+#define RG_GPIO_SND_I2S_WS          GPIO_NUM_6
+#define RG_GPIO_SND_I2S_DATA        GPIO_NUM_5
+#define RG_GPIO_TP_INT              GPIO_NUM_16
+#define RG_GPIO_TP_RST              GPIO_NUM_46
