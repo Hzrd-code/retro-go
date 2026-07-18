@@ -22,7 +22,7 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: Build
+    - name: Build and override target environment
       uses: docker/build-push-action@v6
       with:
         context: .
@@ -30,8 +30,8 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         load: true
-        # Dette tvinger Retro-Go's interne script til at skifte target og chip-arkitektur:
-        build-args: |
+        # Vi overskriver standard-målet ved direkte at definere det som miljøvariabel i Docker-bygningen:
+        secrets: |
           TARGET=t-deck-plus
 
     - name: Extract binaries from docker image
