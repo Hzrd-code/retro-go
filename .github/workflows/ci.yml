@@ -30,14 +30,16 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         load: true
+        build-args: |
+          TARGET=t-deck-plus
 
     - name: Extract binaries from docker image
       run: |
         mkdir -p $(pwd)/build
-        docker run --rm -v $(pwd)/build:/build retro-go:latest sh -c "cp /app/build/*t-deck*.bin /build/ 2>/dev/null || cp /app/*t-deck*.bin /build/ 2>/dev/null || cp /app/build/*.bin /build/ 2>/dev/null || cp /app/*.bin /build/ 2>/dev/null"
+        docker run --rm -v $(pwd)/build:/build retro-go:latest sh -c "cp /app/build/*t-deck*.bin /build/ 2>/dev/null || cp /app/*t-deck*.bin /build/ 2>/dev/null || cp /app/build/*.bin /build/ 2>/dev/null || cp /app/*.bin /build/ 2>/dev/null || echo 'No bin found'"
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: binaries
-        path: build/*.bin
+        path: build/*
