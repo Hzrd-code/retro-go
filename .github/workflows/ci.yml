@@ -30,15 +30,14 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         load: true
+        # Dette tvinger Retro-Go's interne script til at skifte target og chip-arkitektur:
         build-args: |
           TARGET=t-deck-plus
 
     - name: Extract binaries from docker image
       run: |
         mkdir -p $(pwd)/build
-        # Denne kommando gennemsøger alle undermapper i containeren efter .bin filer og kopierer dem ud
         docker run --rm -v $(pwd)/build:/out retro-go:latest sh -c "find /app -name '*.bin' -exec cp {} /out/ \;"
-        # Viser hvad vi har fundet i loggen, så vi kan se det
         ls -la $(pwd)/build
 
     - name: Upload artifacts
