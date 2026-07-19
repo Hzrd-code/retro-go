@@ -7,7 +7,6 @@
 #define RG_STORAGE_SDSPI_SPEED      SDMMC_FREQ_DEFAULT
 
 // GPIO Extender
-// #define RG_I2C_GPIO_DRIVER          0   // 1 = AW9523, 2 = PCF9539, 3 = MCP23017
 #define RG_I2C_GPIO_ADDR            T_DECK_KBD_ADDRESS
 
 // Audio
@@ -64,19 +63,14 @@
 
 // Input
 #define RG_GAMEPAD_I2C_MAP { \
-    {RG_KEY_UP,     .num = 18, .level = 1},\
-    {RG_KEY_RIGHT,  .num = 17, .level = 1},\
-    {RG_KEY_DOWN,   .num = 20, .level = 1},\
-    {RG_KEY_LEFT,   .num = 19, .level = 1},\
-    {RG_KEY_SELECT, .num = 7,  .level = 1},\
-    {RG_KEY_START,  .num = 30, .level = 1},\
-    {RG_KEY_OPTION, .num = 31, .level = 1},\
-    {RG_KEY_A,      .num = 1,  .level = 1},\
-    {RG_KEY_B,      .num = 3,  .level = 1},\
-    {RG_KEY_X,      .num = 0,  .level = 1},\
-    {RG_KEY_Y,      .num = 21, .level = 1},\
-    {RG_KEY_L,      .num = 24, .level = 1},\
-    {RG_KEY_R,      .num = 14, .level = 1},\
+    {RG_KEY_UP,     .num = 2,  .level = 0},\
+    {RG_KEY_RIGHT,  .num = 3,  .level = 0},\
+    {RG_KEY_DOWN,   .num = 4,  .level = 0},\
+    {RG_KEY_LEFT,   .num = 1,  .level = 0},\
+    {RG_KEY_SELECT, .num = 5,  .level = 0},\
+    {RG_KEY_START,  .num = 6,  .level = 0},\
+    {RG_KEY_A,      .num = 0,  .level = 0},\
+    {RG_KEY_B,      .num = 7,  .level = 0},\
 }
 #define RG_GAMEPAD_GPIO_MAP { \
     {RG_KEY_MENU, .num = GPIO_NUM_0, .pullup = 1, .level = 0},\
@@ -84,13 +78,19 @@
 
 #define RG_RECOVERY_BTN             RG_KEY_MENU
 
+// Trackball hardware-pins for det originale T-Deck
+#define RG_GPIO_TRACKBALL_UP    GPIO_NUM_10
+#define RG_GPIO_TRACKBALL_DOWN  GPIO_NUM_15
+#define RG_GPIO_TRACKBALL_LEFT  GPIO_NUM_11
+#define RG_GPIO_TRACKBALL_RIGHT GPIO_NUM_14
+#define RG_GPIO_TRACKBALL_CLICK GPIO_NUM_9
+
 // Battery
 #define RG_BATTERY_DRIVER           0
 #define RG_BATTERY_ADC_UNIT         ADC_UNIT_1
 #define RG_BATTERY_ADC_CHANNEL      ADC1_CHANNEL_3
 #define RG_BATTERY_CALC_PERCENT(raw) (((raw) * 2.f - 3500.f) / (4200.f - 3500.f) * 100.f)
 #define RG_BATTERY_CALC_VOLTAGE(raw) ((raw) * 2.f * 0.001f)
-
 
 // I2C BUS
 #define RG_GPIO_I2C_SDA             GPIO_NUM_18
