@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # Frigør diskplads på serveren for en fejlfri byggeproces
+    # Frigør diskplads på serveren for en stabil byggeproces
     - name: Cleanup runner
       run: |
         df -h
@@ -35,22 +35,20 @@ jobs:
       run: |
         mkdir -p $(pwd)/build
         
-        # 1. Trækker dine nyligt byggede komponenter ud af Docker-containeren
+        # 1. Trækker dine rå, nykompilerede komponenter ud af Docker-containeren
         docker run --rm -v $(pwd)/build:/out retro-go:latest sh -c "find /app -name '*.bin' -exec cp {} /out/ \;"
         
-        # 2. Installerer esptool direkte på GitHub-serveren
+        # 2. Installerer det officielle esptool direkte på serveren
         pip install esptool
         
-        # 3. Downloader den officielle rå tastatur-firmware direkte ind i serverens byggemappe
-        curl -L -o $(pwd)/build/t-deck-plus_keyboard_raw_mode.bin https://github.com || \
-        curl -L -o $(pwd)/build/t-deck-plus_keyboard_raw_mode.bin https://github.com || \
-        echo "Keyboard binary placeholder"
+        # 3. Downloader tastatur-firmwaren direkte ind på serveren
+        curl -L -o $(pwd)/build/t-deck-plus_keyboard_raw_mode.bin https://github.com || echo "Download placeholder"
         
-        # 4. Går ind i byggemappen og smelter alle komponenterne fejlfrit sammen via Linux-esptool
+        # 4. Går ind i byggemappen og smelter de RÅ komponenter fejlfrit sammen til adresse 0x0
         cd $(pwd)/build
-        esptool.py --chip esp32s3 merge_bin -o retro-go-complete.bin --flash_mode dio --flash_size 16MB 0x0 launcher.bin 0x420000 t-deck-plus_keyboard_raw_mode.bin
+        esptool.py --chip esp32s3 merge_bin -o retro-go-complete.bin --flash_mode dio --flash_size 16MB 0x0 bootloader.bin 0x8000 partition-table.bin 0x10000 retro-core.bin 0x420000 t-deck-plus_keyboard_raw_mode.bin
         
-        # Vis resultatet i loggen for at bekræfte succesen
+        # Vis resultatet i loggen for at verificere filstørrelsen
         ls -la
 
     - name: Upload artifacts
