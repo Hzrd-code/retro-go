@@ -1,12 +1,12 @@
-// Target definition
-#define RG_TARGET_NAME             "T-DECK"
+// Target definition - DET SKAL VÆRE PLUS FOR AT RETRO-GO TÆNDER FOR STRØMMEN
+#define RG_TARGET_NAME             "T-DECK-PLUS"
 
 // Storage
 #define RG_STORAGE_ROOT             "/sd"
 #define RG_STORAGE_SDSPI_HOST       SPI2_HOST
 #define RG_STORAGE_SDSPI_SPEED      SDMMC_FREQ_DEFAULT
 
-// GPIO Extender (Aktiverer den manuelle chip-driver til TCA9555)
+// GPIO Extender
 #define RG_I2C_GPIO_DRIVER          2   
 #define RG_I2C_GPIO_ADDR            T_DECK_KBD_ADDRESS
 
@@ -20,9 +20,12 @@
 #define T_DECK_KBD_ADDRESS          0x20
 #define T_DECK_KBD_MODE_RAW_CMD     0x00
 
+// Sørger for at tænde for hovedstrømmen (GPIO 10) og tastatur-strømmen (GPIO 46)
 #define RG_CUSTOM_PLATFORM_INIT()                             \
     gpio_set_direction(T_DECK_BOARD_POWER, GPIO_MODE_OUTPUT); \
     gpio_set_level(T_DECK_BOARD_POWER, 1);                    \
+    gpio_set_direction(RG_GPIO_TP_RST, GPIO_MODE_OUTPUT);     \
+    gpio_set_level(RG_GPIO_TP_RST, 1);                        \
     gpio_set_direction(RG_GPIO_SDSPI_CS, GPIO_MODE_OUTPUT);   \
     gpio_set_direction(T_DECK_RADIO_CS, GPIO_MODE_OUTPUT);    \
     gpio_set_direction(RG_GPIO_LCD_CS, GPIO_MODE_OUTPUT);     \
@@ -41,7 +44,7 @@
 #define RG_SCREEN_HEIGHT            240
 #define RG_SCREEN_ROTATE            0
 
-// Input Matrix (Det officielle layout til det originale T-Deck tastatur via driver 2)
+// Input Matrix
 #define RG_GAMEPAD_I2C_MAP { \
     {RG_KEY_UP,     .num = 0,  .level = 0},\
     {RG_KEY_DOWN,   .num = 1,  .level = 0},\
@@ -58,7 +61,7 @@
 
 #define RG_RECOVERY_BTN             RG_KEY_MENU
 
-// Trackball hardware-pins (Pulstællere på ESP32-S3)
+// Trackball hardware-pins
 #define RG_GPIO_TRACKBALL_UP    GPIO_NUM_10
 #define RG_GPIO_TRACKBALL_DOWN  GPIO_NUM_15
 #define RG_GPIO_TRACKBALL_LEFT  GPIO_NUM_11
@@ -86,7 +89,7 @@
 #define RG_GPIO_SDSPI_CLK           GPIO_NUM_40
 #define RG_GPIO_SDSPI_CS            GPIO_NUM_39
 
-// External I2S DAC & Tastatur-afbryder
+// External I2S DAC
 #define RG_GPIO_SND_I2S_BCK         GPIO_NUM_7
 #define RG_GPIO_SND_I2S_WS          GPIO_NUM_6
 #define RG_GPIO_SND_I2S_DATA        GPIO_NUM_5
