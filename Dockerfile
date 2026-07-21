@@ -14,4 +14,6 @@ RUN cd /opt/esp/idf && \
 # Build
 SHELL ["/bin/bash", "-c"]
 RUN . /opt/esp/idf/export.sh && \
+    python rg_tool.py --target=t-deck-plus config && \
+    sed -i 's/CONFIG_RETRO_GO_INPUT_TDECK=y/CONFIG_RETRO_GO_INPUT_TCA9555=y/g' sdkconfig && \
     python rg_tool.py --target=t-deck-plus build
