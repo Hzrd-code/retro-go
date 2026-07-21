@@ -3,13 +3,11 @@
 #include "rg_i2c.h"
 #include <driver/gpio.h>
 #include <driver/adc.h>
-#include <esp_adc_cal.h>
 
 #define T_DECK_KBD_ADDRESS 0x20
 
 volatile uint32_t gamepad_state = 0;
 static bool input_task_running = false;
-static esp_adc_cal_characteristics_t *adc_chars;
 
 bool rg_input_init(void)
 {
@@ -29,11 +27,9 @@ bool rg_input_init(void)
     gpio_reset_pin(GPIO_NUM_14); gpio_set_direction(GPIO_NUM_14, GPIO_MODE_INPUT); gpio_set_pull_mode(GPIO_NUM_14, GPIO_PULLUP_ONLY);
     gpio_reset_pin(GPIO_NUM_9);  gpio_set_direction(GPIO_NUM_9,  GPIO_MODE_INPUT); gpio_set_pull_mode(GPIO_NUM_9,  GPIO_PULLUP_ONLY);
 
-    // 4. Konfigurer den rigtige Batteri ADC-driver til T-Deck
+    // 4. Konfigurer Batteri ADC-driver til T-Deck (ADC1 Kanal 3 / GPIO 4)
     adc1_config_width(ADC_WIDTH_BIT_12);
     adc1_config_channel_atten(ADC1_CHANNEL_3, ADC_ATTEN_DB_11);
-    adc_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
-    esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, adc_chars);
 
     input_task_running = true;
     return true;
@@ -88,11 +84,11 @@ rg_battery_t rg_input_read_battery(void)
 {
     rg_battery_t battery = { .voltage = 4.0f, .percentage = 80, .is_charging = false };
     
-    // Læs den ægte spænding fra T-Deck hardwaren
-    uint32_t raw = adc1_get_raw(ADC1_CHANNEL_3);
-    uint32_t mv = esp_adc_cal_raw_to_voltage(raw, adc_chars) * 2; // Gange 2 pga. spændingsdeler
+    // Læs den rå spænding direkte uden kalibrerings-objekter
+    int raw = adc1_get_raw(ADC1_CHANNEL_3);
     
-    battery.voltage = mv * 0.001f;
+    // Beregn spænding baseret på T-Decks interne spændingsdeler (2 * 3.3V * rå / 4095)
+    battery.voltage = ((float)raw / 4095.0f) * 3.3f * 2.0f;
     battery.percentage = ((battery.voltage - 3.5f) / (4.2f - 3.5f)) * 100.0f;
     
     if (battery.percentage > 100) battery.percentage = 100;
