@@ -105,110 +105,58 @@ bool rg_input_read_battery_raw(rg_battery_t *out)
 
 bool rg_input_read_gamepad_raw(uint32_t *out)
 {
-    uint32_t state = 0;
+    static bool initialized = false;
+    if (!initialized) {
+        // Tænd og reset periferi (GPIO 46)
+        gpio_config_t io_conf = {
+            .pin_bit_mask = (1ULL << 46),
+            .mode = GPIO_MODE_OUTPUT,
+            .pull_up_en = GPIO_PULLUP_DISABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_DISABLE
+        };
+        gpio_config(&io_conf);
+        gpio_set_level(46, 1);
+        vTaskDelay(pdMS_TO_TICKS(50));
 
-#if defined(RG_GAMEPAD_ADC_MAP)
-    static int old_adc_values[RG_COUNT(keymap_adc)];
-    for (size_t i = 0; i < RG_COUNT(keymap_adc); ++i)
-    {
-        const rg_keymap_adc_t *mapping = &keymap_adc[i];
-        int value = adc_get_raw(mapping->unit, mapping->channel);
-        if (value >= mapping->min && value <= mapping->max)
-        {
-            if (abs(old_adc_values[i] - value) < RG_GAMEPAD_ADC_FILTER_WINDOW)
-                state |= mapping->key;
-            // else
-            //     RG_LOGD("Rejected input: %d", old_adc_values[i] - value);
-            old_adc_values[i] = value;
+        // Konfigurer TCA9555 (Port 0 og 1 som input: 0xFF)
+        uint8_t config_p0[] = {0x06, 0xFF};
+        uint8_t config_p1[] = {0x07, 0xFF};
+        rg_i2c_write(0x20, -1, config_p0, 2);
+        rg_i2c_write(0x20, -1, config_p1, 2);
+
+        // Konfigurer Trackball GPIOs (T-Deck: Up=2, Down=3, Left=1, Right=15, Click=0)
+        int pins[] = {0, 1, 2, 3, 15};
+        for (int i = 0; i < 5; i++) {
+            gpio_reset_pin(pins[i]);
+            gpio_set_direction(pins[i], GPIO_MODE_INPUT);
+            gpio_set_pull_mode(pins[i], GPIO_PULLUP_ONLY);
         }
+        initialized = true;
     }
-#endif
 
-#if defined(RG_GAMEPAD_GPIO_MAP)
-    for (size_t i = 0; i < RG_COUNT(keymap_gpio); ++i)
-    {
-        const rg_keymap_gpio_t *mapping = &keymap_gpio[i];
-        if (gpio_get_level(mapping->num) == mapping->level)
-            state |= mapping->key;
-    }
-#endif
-
-#if defined(RG_GAMEPAD_I2C_MAP)
     uint32_t buttons = 0;
-#if defined(RG_I2C_GPIO_DRIVER)
-    int data0 = rg_i2c_gpio_read_port(0), data1 = rg_i2c_gpio_read_port(1);
-    if (data0 > -1) // && data1 > -1)
-    {
-        buttons = (data1 << 8) | (data0);
-#elif defined(RG_TARGET_T_DECK_PLUS)
-    uint8_t data[5];
-    if (rg_i2c_read(T_DECK_KBD_ADDRESS, -1, &data, 5))
-    {
-        buttons = ((data[0] << 25) | (data[1] << 18) | (data[2] << 11) | ((data[3] & 0xF8) << 4) | (data[4]));
-#else
-    uint8_t data[5];
-    if (rg_i2c_read(RG_I2C_GPIO_ADDR, -1, &data, 5))
-    {
-        buttons = (data[2] << 8) | (data[1]);
-#endif
-        for (size_t i = 0; i < RG_COUNT(keymap_i2c); ++i)
-        {
-            const rg_keymap_i2c_t *mapping = &keymap_i2c[i];
-            if (((buttons >> mapping->num) & 1) == mapping->level)
-                state |= mapping->key;
-        }
-    }
-#endif
 
-#if defined(RG_GAMEPAD_KBD_MAP)
-#ifdef RG_TARGET_SDL2
-    int numkeys = 0;
-    const uint8_t *keys = SDL_GetKeyboardState(&numkeys);
-    for (size_t i = 0; i < RG_COUNT(keymap_kbd); ++i)
-    {
-        const rg_keymap_kbd_t *mapping = &keymap_kbd[i];
-        if (mapping->src < 0 || mapping->src >= numkeys)
-            continue;
-        if (keys[mapping->src])
-            state |= mapping->key;
+    // Læs tastatur-matrix fra TCA9555
+    uint8_t data[] = {0xFF, 0xFF};
+    if (rg_i2c_read(0x20, 0x00, data, 2)) {
+        uint16_t matrix = (data[1] << 8) | data[0];
+        
+        // Eksempel på bit-mapping (TCA9555 returnerer 0 ved tryk)
+        if (!(matrix & (1 << 0)))  buttons |= RG_KEY_A;
+        if (!(matrix & (1 << 1)))  buttons |= RG_KEY_B;
+        if (!(matrix & (1 << 2)))  buttons |= RG_KEY_SELECT;
+        if (!(matrix & (1 << 3)))  buttons |= RG_KEY_START;
     }
-#else
-#warning "not implemented"
-#endif
-#endif
 
-#if defined(RG_GAMEPAD_SERIAL_MAP)
-    gpio_set_level(RG_GPIO_GAMEPAD_LATCH, 0);
-    rg_usleep(5);
-    gpio_set_level(RG_GPIO_GAMEPAD_LATCH, 1);
-    rg_usleep(1);
-    uint32_t buttons = 0;
-    for (int i = 0; i < 16; i++)
-    {
-        buttons |= gpio_get_level(RG_GPIO_GAMEPAD_DATA) << (15 - i);
-        gpio_set_level(RG_GPIO_GAMEPAD_CLOCK, 0);
-        rg_usleep(1);
-        gpio_set_level(RG_GPIO_GAMEPAD_CLOCK, 1);
-        rg_usleep(1);
-    }
-    for (size_t i = 0; i < RG_COUNT(keymap_serial); ++i)
-    {
-        const rg_keymap_serial_t *mapping = &keymap_serial[i];
-        if (((buttons >> mapping->num) & 1) == mapping->level)
-            state |= mapping->key;
-    }
-#endif
+    // Læs Trackball og map til D-Pad (Active Low på T-Deck)
+    if (!gpio_get_level(2))  buttons |= RG_KEY_UP;
+    if (!gpio_get_level(3))  buttons |= RG_KEY_DOWN;
+    if (!gpio_get_level(1))  buttons |= RG_KEY_LEFT;
+    if (!gpio_get_level(15)) buttons |= RG_KEY_RIGHT;
+    if (!gpio_get_level(0))  buttons |= RG_KEY_A; // Klik som A
 
-#if defined(RG_GAMEPAD_VIRT_MAP)
-    for (size_t i = 0; i < RG_COUNT(keymap_virt); ++i)
-    {
-        if (state == keymap_virt[i].src)
-            state = keymap_virt[i].key;
-    }
-#endif
-
-    if (out)
-        *out = state;
+    *out = buttons;
     return true;
 }
 
