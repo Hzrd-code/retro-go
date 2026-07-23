@@ -108,33 +108,39 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
     uint32_t state = 0;
 
 #ifdef ESP_PLATFORM
-    // 1. Initialiser Trackball-pinde med stærke Pull-ups (forhindrer at den "går amok")
-    static bool gpio_inited = false;
-    if (!gpio_inited)
+    // 1. Tving stærke hardware pull-ups på trackball pinde ved HVER læsning (forhindrer at den stikker af)
+    const gpio_num_t tb_pins[] = {GPIO_NUM_0, GPIO_NUM_1, GPIO_NUM_2, GPIO_NUM_3, GPIO_NUM_15};
+    for (int i = 0; i < 5; i++)
     {
-        const gpio_num_t tb_pins[] = {GPIO_NUM_0, GPIO_NUM_1, GPIO_NUM_2, GPIO_NUM_3, GPIO_NUM_15};
-        for (int i = 0; i < 5; i++)
-        {
-            gpio_reset_pin(tb_pins[i]);
-            gpio_set_direction(tb_pins[i], GPIO_MODE_INPUT);
-            gpio_set_pull_mode(tb_pins[i], GPIO_PULLUP_ONLY);
-        }
-        // Tving strøm på T-Deck periferi/tastatur
-        gpio_reset_pin(GPIO_NUM_46);
-        gpio_set_direction(GPIO_NUM_46, GPIO_MODE_OUTPUT);
-        gpio_set_level(GPIO_NUM_46, 1);
-        
-        gpio_inited = true;
+        gpio_set_direction(tb_pins[i], GPIO_MODE_INPUT);
+        gpio_set_pull_mode(tb_pins[i], GPIO_PULLUP_ONLY);
     }
 
-    // 2. LÆS TRACKBALL (Lav-Aktiv = trykket ned/aktiveret)
-    if (gpio_get_level(GPIO_NUM_3) == 0)  state |= RG_KEY_UP;
-    if (gpio_get_level(GPIO_NUM_15) == 0) state |= RG_KEY_DOWN;
-    if (gpio_get_level(GPIO_NUM_1) == 0)  state |= RG_KEY_LEFT;
-    if (gpio_get_level(GPIO_NUM_2) == 0)  state |= RG_KEY_RIGHT;
-    if (gpio_get_level(GPIO_NUM_0) == 0)  state |= RG_KEY_A; // Trackball-klik
+    // Tving strøm på T-Deck periferi/I2C
+    gpio_set_direction(GPIO_NUM_46, GPIO_MODE_OUTPUT);
+    gpio_set_level(GPIO_NUM_46, 1);
 
-    // 3. LÆS TASTATUR (TCA9555 over I2C 0x20)
+    // 2. LÆS TRACKBALL MED IMPULS-DÆMPNING (Rate Limiting)
+    static uint64_t last_tb_time = 0;
+    uint64_t now = rg_system_timer();
+    
+    // Kun tillad et trackball-skift for hver 120ms (forhindrer at den går amok)
+    if (now - last_tb_time > 120000)
+    {
+        bool moved = false;
+        if (gpio_get_level(GPIO_NUM_3) == 0)  { state |= RG_KEY_UP; moved = true; }
+        if (gpio_get_level(GPIO_NUM_15) == 0) { state |= RG_KEY_DOWN; moved = true; }
+        if (gpio_get_level(GPIO_NUM_1) == 0)  { state |= RG_KEY_LEFT; moved = true; }
+        if (gpio_get_level(GPIO_NUM_2) == 0)  { state |= RG_KEY_RIGHT; moved = true; }
+        
+        if (moved)
+            last_tb_time = now;
+    }
+
+    // Trackball-klik (skal reageres på med det samme uden tidsforsinkelse)
+    if (gpio_get_level(GPIO_NUM_0) == 0)  state |= RG_KEY_A;
+
+    // 3. LÆS TASTATUR (TCA9555 over I2C)
     uint8_t data[2] = {0xFF, 0xFF};
     if (rg_i2c_read(0x20, 0x00, data, 2) || rg_i2c_read(0x20, -1, data, 2))
     {
