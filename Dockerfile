@@ -12,4 +12,4 @@ RUN cd /opt/esp/idf && \
 # Build og generer det komplette factory image
 SHELL ["/bin/bash", "-c"]
 RUN . /opt/esp/idf/export.sh && \
-    python rg_tool.py --target=t-deck-plus build-img
+    python rg_tool.py --target=t-deck build-img
