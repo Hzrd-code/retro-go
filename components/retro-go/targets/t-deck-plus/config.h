@@ -102,7 +102,7 @@
 // SPI Display
 #define RG_GPIO_LCD_MISO            GPIO_NUM_38
 #define RG_GPIO_LCD_MOSI            GPIO_NUM_41
-#replace RG_GPIO_LCD_CLK            GPIO_NUM_40
+#define RG_GPIO_LCD_CLK            GPIO_NUM_40
 #define RG_GPIO_LCD_CS              GPIO_NUM_12
 #define RG_GPIO_LCD_DC              GPIO_NUM_11
 #define RG_GPIO_LCD_BCKL            GPIO_NUM_42
