@@ -45,7 +45,7 @@ static uint32_t gamepad_state = -1; // _Atomic
 static uint32_t gamepad_mapped = 0;
 static rg_battery_t battery_state = {0};
 
-#define UPDATE_GLOBAL_MAP(keymap)                 \
+#define UPDATE_GLOBAL_MAP(keymap)                   \
     for (size_t i = 0; i < RG_COUNT(keymap); ++i) \
         gamepad_mapped |= keymap[i].key;          \
 
@@ -109,7 +109,7 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
 {
     static bool initialized = false;
     if (!initialized) {
-        // Tænd og reset periferi (GPIO 46)
+        // 1. Tænd/Reset tastatur og skærm touch controller (GPIO 46)
         gpio_config_t io_conf = {
             .pin_bit_mask = (1ULL << 46),
             .mode = GPIO_MODE_OUTPUT,
@@ -118,47 +118,65 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
             .intr_type = GPIO_INTR_DISABLE
         };
         gpio_config(&io_conf);
-        gpio_set_level(46, 1);
-        vTaskDelay(pdMS_TO_TICKS(50));
+        gpio_set_level(GPIO_NUM_46, 1);
 
-        // Konfigurer TCA9555 (Port 0 og 1 som input: 0xFF)
+        // 2. Initialiser TCA9555 I2C Extender (Port 0 og Port 1 som inputs: 0xFF)
         uint8_t config_p0[] = {0x06, 0xFF};
         uint8_t config_p1[] = {0x07, 0xFF};
         rg_i2c_write(0x20, -1, config_p0, 2);
         rg_i2c_write(0x20, -1, config_p1, 2);
 
-        // Konfigurer Trackball GPIOs (T-Deck: Up=2, Down=3, Left=1, Right=15, Click=0)
-        int pins[] = {0, 1, 2, 3, 15};
-        for (int i = 0; i < 5; i++) {
-            gpio_reset_pin(pins[i]);
-            gpio_set_direction(pins[i], GPIO_MODE_INPUT);
-            gpio_set_pull_mode(pins[i], GPIO_PULLUP_ONLY);
-        }
+        // 3. Konfigurer Trackball GPIOs (T-Deck: Up=3, Down=15, Left=1, Right=2, Click=0)
+        gpio_config_t tb_conf = {
+            .pin_bit_mask = (1ULL << RG_GPIO_TRACKBALL_UP) |
+                            (1ULL << RG_GPIO_TRACKBALL_DOWN) |
+                            (1ULL << RG_GPIO_TRACKBALL_LEFT) |
+                            (1ULL << RG_GPIO_TRACKBALL_RIGHT) |
+                            (1ULL << RG_GPIO_TRACKBALL_CLICK),
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = GPIO_PULLUP_ENABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_DISABLE
+        };
+        gpio_config(&tb_conf);
+
         initialized = true;
     }
 
-    uint32_t buttons = 0;
+    uint32_t gamepad = 0;
 
-    // Læs tastatur-matrix fra TCA9555
-    uint8_t data[] = {0xFF, 0xFF};
-    if (rg_i2c_read(0x20, 0x00, data, 2)) {
-        uint16_t matrix = (data[1] << 8) | data[0];
+    // Læs TCA9555 tastatur matrix over I2C adresse 0x20
+    uint8_t i2c_data[2] = {0xFF, 0xFF};
+    if (rg_i2c_read(0x20, 0x00, i2c_data, 2)) {
+        uint16_t pins = i2c_data[0] | (i2c_data[1] << 8);
         
-        // Eksempel på bit-mapping (TCA9555 returnerer 0 ved tryk)
-        if (!(matrix & (1 << 0)))  buttons |= RG_KEY_A;
-        if (!(matrix & (1 << 1)))  buttons |= RG_KEY_B;
-        if (!(matrix & (1 << 2)))  buttons |= RG_KEY_SELECT;
-        if (!(matrix & (1 << 3)))  buttons |= RG_KEY_START;
+        // Active Low mapping (0 = trykket ned)
+        if (!(pins & (1 << 0))) gamepad |= RG_KEY_UP;
+        if (!(pins & (1 << 1))) gamepad |= RG_KEY_DOWN;
+        if (!(pins & (1 << 2))) gamepad |= RG_KEY_LEFT;
+        if (!(pins & (1 << 3))) gamepad |= RG_KEY_RIGHT;
+        if (!(pins & (1 << 4))) gamepad |= RG_KEY_A;
+        if (!(pins & (1 << 5))) gamepad |= RG_KEY_B;
+        if (!(pins & (1 << 6))) gamepad |= RG_KEY_SELECT;
+        if (!(pins & (1 << 7))) gamepad |= RG_KEY_START;
     }
 
-    // Læs Trackball og map til D-Pad (Active Low på T-Deck)
-    if (!gpio_get_level(2))  buttons |= RG_KEY_UP;
-    if (!gpio_get_level(3))  buttons |= RG_KEY_DOWN;
-    if (!gpio_get_level(1))  buttons |= RG_KEY_LEFT;
-    if (!gpio_get_level(15)) buttons |= RG_KEY_RIGHT;
-    if (!gpio_get_level(0))  buttons |= RG_KEY_A; // Klik som A
+    // Læs Trackball GPIOs (Active Low)
+    if (gpio_get_level(RG_GPIO_TRACKBALL_UP) == 0)    gamepad |= RG_KEY_UP;
+    if (gpio_get_level(RG_GPIO_TRACKBALL_DOWN) == 0)  gamepad |= RG_KEY_DOWN;
+    if (gpio_get_level(RG_GPIO_TRACKBALL_LEFT) == 0)  gamepad |= RG_KEY_LEFT;
+    if (gpio_get_level(RG_GPIO_TRACKBALL_RIGHT) == 0) gamepad |= RG_KEY_RIGHT;
+    if (gpio_get_level(RG_GPIO_TRACKBALL_CLICK) == 0) gamepad |= RG_KEY_A;
 
-    *out = buttons;
+    // Læs Boot / Menu knappen (GPIO 0)
+    if (gpio_get_level(GPIO_NUM_0) == 0) {
+        gamepad |= RG_KEY_MENU;
+    }
+
+    if (out) {
+        *out = gamepad;
+    }
+
     return true;
 }
 
@@ -283,7 +301,6 @@ void rg_input_init(void)
     gpio_set_level(RG_GPIO_GAMEPAD_CLOCK, 1);
     UPDATE_GLOBAL_MAP(keymap_serial);
 #endif
-
 
 #if RG_BATTERY_DRIVER == 1 /* ADC */
     RG_LOGI("Initializing ADC battery driver...");
