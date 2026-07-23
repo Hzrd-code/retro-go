@@ -23,17 +23,17 @@
 // Touch & Keypad Reset Pin
 #define RG_GPIO_TP_RST              GPIO_NUM_46
 
-#define RG_CUSTOM_PLATFORM_INIT()                              \
+#define RG_CUSTOM_PLATFORM_INIT()                               \
     gpio_set_direction(T_DECK_BOARD_POWER, GPIO_MODE_OUTPUT); \
     gpio_set_level(T_DECK_BOARD_POWER, 1);                    \
-    gpio_set_direction(RG_GPIO_TP_RST, GPIO_MODE_OUTPUT);     \
-    gpio_set_level(RG_GPIO_TP_RST, 1);                        \
-    gpio_set_direction(RG_GPIO_SDSPI_CS, GPIO_MODE_OUTPUT);   \
-    gpio_set_direction(T_DECK_RADIO_CS, GPIO_MODE_OUTPUT);    \
-    gpio_set_direction(RG_GPIO_LCD_CS, GPIO_MODE_OUTPUT);     \
-    gpio_set_level(RG_GPIO_SDSPI_CS, 1);                       \
+    gpio_set_direction(RG_GPIO_TP_RST, GPIO_MODE_OUTPUT);      \
+    gpio_set_level(RG_GPIO_TP_RST, 1);                         \
+    gpio_set_direction(RG_GPIO_SDSPI_CS, GPIO_MODE_OUTPUT);    \
+    gpio_set_direction(T_DECK_RADIO_CS, GPIO_MODE_OUTPUT);     \
+    gpio_set_direction(RG_GPIO_LCD_CS, GPIO_MODE_OUTPUT);      \
+    gpio_set_level(RG_GPIO_SDSPI_CS, 1);                        \
     gpio_set_level(T_DECK_RADIO_CS, 1);                        \
-    gpio_set_level(RG_GPIO_LCD_CS, 1);                        \
+    gpio_set_level(RG_GPIO_LCD_CS, 1);                         \
     gpio_set_pull_mode(RG_GPIO_SDSPI_MISO, GPIO_PULLUP_ONLY); \
     rg_task_delay(50);
 
@@ -67,7 +67,7 @@
     ILI9341_CMD(0xE0, 0xD0, 0x00, 0x02, 0x07, 0x0a, 0x28, 0x32, 0x44, 0x42, 0x06, 0x0e, 0x12, 0x14, 0x17);       \
     ILI9341_CMD(0xE1, 0xD0, 0x00, 0x02, 0x07, 0x0a, 0x28, 0x31, 0x54, 0x47, 0x0E, 0x1C, 0x17, 0x1b, 0x1e);       \
 
-// Input
+// Input - Standard T-Deck Keyboard Mapping
 #define RG_GAMEPAD_I2C_MAP { \
     {RG_KEY_UP,     .num = 0,  .level = 0},\
     {RG_KEY_DOWN,   .num = 1,  .level = 0},\
@@ -77,9 +77,16 @@
     {RG_KEY_B,      .num = 5,  .level = 0},\
     {RG_KEY_SELECT, .num = 6,  .level = 0},\
     {RG_KEY_START,  .num = 7,  .level = 0},\
+    {RG_KEY_MENU,   .num = 8,  .level = 0},\
 }
+
+// Input - Standard T-Deck Trackball GPIO Mapping
 #define RG_GAMEPAD_GPIO_MAP { \
-    {RG_KEY_MENU, .num = GPIO_NUM_0, .pullup = 1, .level = 0},\
+    {RG_KEY_UP,    .num = GPIO_NUM_3,  .pullup = 1, .level = 0},\
+    {RG_KEY_DOWN,  .num = GPIO_NUM_15, .pullup = 1, .level = 0},\
+    {RG_KEY_LEFT,  .num = GPIO_NUM_1,  .pullup = 1, .level = 0},\
+    {RG_KEY_RIGHT, .num = GPIO_NUM_2,  .pullup = 1, .level = 0},\
+    {RG_KEY_A,     .num = GPIO_NUM_0,  .pullup = 1, .level = 0},\
 }
 
 #define RG_RECOVERY_BTN             RG_KEY_MENU
