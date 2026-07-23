@@ -81,7 +81,17 @@ static uint32_t rg_input_read_i2c_gamepad(void)
 {
     uint32_t state = 0;
 #if defined(RG_GAMEPAD_I2C_MAP)
-    // Hvis I2C er aktiveret i config.h, læses I2C herfra
+    uint8_t data[5];
+    if (rg_i2c_read(T_DECK_KBD_ADDRESS, -1, &data, 5))
+    {
+        uint32_t buttons = (data[2] << 8) | (data[1]);
+        for (size_t i = 0; i < RG_COUNT(keymap_i2c); ++i)
+        {
+            const rg_keymap_i2c_t *mapping = &keymap_i2c[i];
+            if (((buttons >> mapping->num) & 1) == mapping->level)
+                state |= mapping->key;
+        }
+    }
 #endif
     return state;
 }
@@ -144,7 +154,7 @@ static void input_task(void *arg)
     uint32_t state;
     int64_t next_battery_update = 0;
 
-    memset(debounce, 0x00, sizeof(debounce)); // Ændret til 0x00 så den ikke tror knapper holdes nede ved boot!
+    memset(debounce, 0x00, sizeof(debounce));
     input_task_running = true;
 
     while (input_task_running)
