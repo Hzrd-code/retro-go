@@ -3,8 +3,8 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
 #include "driver/gpio.h"
-#include "driver/i2c.h"
 #include "esp_log.h"
 #include "rg_system.h"
 #include "rg_input.h"
@@ -12,16 +12,19 @@
 
 static const char *TAG = "rg_input";
 
+// --- T-DECK SPECIFIK HARDWARE-KONFIGURATION ---
 #define TDECK_I2C_SDA          GPIO_NUM_18
 #define TDECK_I2C_SCL          GPIO_NUM_8
 #define TDECK_I2C_PWR          GPIO_NUM_46
 #define TDECK_KEYBOARD_ADDR    0x20
 
+static QueueHandle_t input_queue = NULL;
+static TaskHandle_t input_task_handle = NULL;
 static int gamepad_state = 0;
 static bool driver_initialized = false;
 
-// Tving I2C-bussen til at nulstille hvis M5Launcher har låst den
-static void force_i2c_bus_reset(void)
+// Tving I2C-bussen til at nulstille (Løser blokeret I2C fra M5Launcher)
+static void tdeck_force_i2c_bus_reset(void)
 {
     gpio_reset_pin(TDECK_I2C_SDA);
     gpio_reset_pin(TDECK_I2C_SCL);
@@ -30,7 +33,6 @@ static void force_i2c_bus_reset(void)
     gpio_set_level(TDECK_I2C_SDA, 1);
     gpio_set_level(TDECK_I2C_SCL, 1);
 
-    // Send 9 clock pulser for at låse hængte I2C enheder op
     for (int i = 0; i < 9; i++) {
         gpio_set_level(TDECK_I2C_SCL, 0);
         vTaskDelay(pdMS_TO_TICKS(1));
@@ -39,22 +41,19 @@ static void force_i2c_bus_reset(void)
     }
 }
 
-bool rg_input_init(void)
+// T-Deck Hardware Initialisering
+static void tdeck_init_hardware(void)
 {
-    if (driver_initialized) return true;
-
-    ESP_LOGI(TAG, "Initializing T-Deck Input (M5Launcher Fix)...");
-
-    // 1. Tænd for strøm til T-Deck periferi (GPIO 46)
+    // 1. Tænd strøm til I2C/skærm/periferi (GPIO 46)
     gpio_reset_pin(TDECK_I2C_PWR);
     gpio_set_direction(TDECK_I2C_PWR, GPIO_MODE_OUTPUT);
     gpio_set_level(TDECK_I2C_PWR, 1);
-    vTaskDelay(pdMS_TO_TICKS(50)); // Vent på strømmen stabiliserer sig
+    vTaskDelay(pdMS_TO_TICKS(30));
 
     // 2. Fysisk reset af I2C bussen
-    force_i2c_bus_reset();
+    tdeck_force_i2c_bus_reset();
 
-    // 3. Trackball GPIOs (PULLUP for at fjerne støj / spøgelsestryk)
+    // 3. Modstande (PULL-UPs) på trackball for at fjerne spøgelses-bevægelser
     const gpio_num_t tb_pins[] = {GPIO_NUM_0, GPIO_NUM_1, GPIO_NUM_2, GPIO_NUM_3, GPIO_NUM_15};
     for (int i = 0; i < 5; i++) {
         gpio_reset_pin(tb_pins[i]);
@@ -62,41 +61,31 @@ bool rg_input_init(void)
         gpio_set_pull_mode(tb_pins[i], GPIO_PULLUP_ONLY);
     }
 
-    // 4. Start Retro-Go I2C driver
+    // 4. Initialiser Retro-Go I2C og konfigurer tastatur-chippen (TCA9555)
     rg_i2c_init();
-
-    // 5. Konfigurer TCA9555 tastatur-extender
     uint8_t cfg0[] = {0x06, 0xFF};
     uint8_t cfg1[] = {0x07, 0xFF};
     rg_i2c_write(TDECK_KEYBOARD_ADDR, -1, cfg0, 2);
     rg_i2c_write(TDECK_KEYBOARD_ADDR, -1, cfg1, 2);
-
-    driver_initialized = true;
-    return true;
-}
-
-bool rg_input_deinit(void)
-{
-    driver_initialized = false;
-    return true;
 }
 
 bool rg_input_read_gamepad_raw(uint32_t *out)
 {
     if (!driver_initialized) {
-        rg_input_init();
+        tdeck_init_hardware();
+        driver_initialized = true;
     }
 
     uint32_t gamepad = 0;
 
-    // --- A. TRACKBALL ---
+    // --- A. LÆS TRACKBALL ---
     if (gpio_get_level(GPIO_NUM_3) == 0)  gamepad |= RG_KEY_UP;
     if (gpio_get_level(GPIO_NUM_15) == 0) gamepad |= RG_KEY_DOWN;
     if (gpio_get_level(GPIO_NUM_1) == 0)  gamepad |= RG_KEY_LEFT;
     if (gpio_get_level(GPIO_NUM_2) == 0)  gamepad |= RG_KEY_RIGHT;
     if (gpio_get_level(GPIO_NUM_0) == 0)  gamepad |= RG_KEY_A;
 
-    // --- B. I2C TASTATUR ---
+    // --- B. LÆS TASTATUR VIA I2C (TCA9555) ---
     uint8_t i2c_data[2] = {0xFF, 0xFF};
     if (rg_i2c_read(TDECK_KEYBOARD_ADDR, 0x00, i2c_data, 2)) {
         uint16_t key_pins = i2c_data[0] | (i2c_data[1] << 8);
@@ -114,17 +103,84 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
         }
     }
 
-    gamepad_state = gamepad;
-    if (out) *out = gamepad;
+    if (out) {
+        *out = gamepad;
+    }
 
+    return true;
+}
+
+static void rg_input_task(void *arg)
+{
+    rg_input_event_t event;
+    uint32_t last_state = 0;
+
+    while (1) {
+        uint32_t current_state = 0;
+        rg_input_read_gamepad_raw(&current_state);
+        gamepad_state = current_state;
+
+        // Generer input-events hvis knaptilstanden ændrer sig
+        uint32_t changed = current_state ^ last_state;
+        if (changed && input_queue) {
+            for (int i = 0; i < 32; i++) {
+                uint32_t mask = (1 << i);
+                if (changed & mask) {
+                    event.key = mask;
+                    event.pressed = (current_state & mask) ? true : false;
+                    xQueueSend(input_queue, &event, 0);
+                }
+            }
+        }
+
+        last_state = current_state;
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
+
+bool rg_input_init(void)
+{
+    if (driver_initialized) {
+        return true;
+    }
+
+    ESP_LOGI(TAG, "Initializing Retro-Go Input for T-Deck...");
+
+    tdeck_init_hardware();
+
+    input_queue = xQueueCreate(16, sizeof(rg_input_event_t));
+
+    xTaskCreatePinnedToCore(rg_input_task, "rg_input_task", 3072, NULL, 5, &input_task_handle, 1);
+
+    driver_initialized = true;
+    ESP_LOGI(TAG, "Input Subsystem Ready.");
+    return true;
+}
+
+bool rg_input_deinit(void)
+{
+    ESP_LOGI(TAG, "Deinitializing Input Subsystem...");
+    if (input_task_handle) {
+        vTaskDelete(input_task_handle);
+        input_task_handle = NULL;
+    }
+    if (input_queue) {
+        vQueueDelete(input_queue);
+        input_queue = NULL;
+    }
+    driver_initialized = false;
     return true;
 }
 
 uint32_t rg_input_read_gamepad(void)
 {
-    uint32_t val = 0;
-    rg_input_read_gamepad_raw(&val);
-    return val;
+    return gamepad_state;
+}
+
+bool rg_input_get_event(rg_input_event_t *event, uint32_t timeout_ms)
+{
+    if (!input_queue) return false;
+    return xQueueReceive(input_queue, event, pdMS_TO_TICKS(timeout_ms)) == pdTRUE;
 }
 
 int rg_input_get_battery_level(void)
