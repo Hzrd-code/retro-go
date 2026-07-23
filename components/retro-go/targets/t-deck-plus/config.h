@@ -78,17 +78,17 @@
     {RG_KEY_A,     .num = GPIO_NUM_0,  .pullup = 1, .level = 0},\
 }
 
-// Input 2: Tastatur på I2C (TCA9555)
+// Input 2: Tastatur på I2C (Mappet til WASD for bevægelse)
 #define RG_GAMEPAD_I2C_MAP { \
-    {RG_KEY_UP,     .num = 0, .level = 0},\
-    {RG_KEY_DOWN,   .num = 1, .level = 0},\
-    {RG_KEY_LEFT,   .num = 2, .level = 0},\
-    {RG_KEY_RIGHT,  .num = 3, .level = 0},\
-    {RG_KEY_A,      .num = 4, .level = 0},\
-    {RG_KEY_B,      .num = 5, .level = 0},\
-    {RG_KEY_SELECT, .num = 6, .level = 0},\
-    {RG_KEY_START,  .num = 7, .level = 0},\
-    {RG_KEY_MENU,   .num = 8, .level = 0},\
+    {RG_KEY_UP,     .num = 0, .level = 0},  /* 'W' tasten */ \
+    {RG_KEY_LEFT,   .num = 1, .level = 0},  /* 'A' tasten */ \
+    {RG_KEY_DOWN,   .num = 2, .level = 0},  /* 'S' tasten */ \
+    {RG_KEY_RIGHT,  .num = 3, .level = 0},  /* 'D' tasten */ \
+    {RG_KEY_A,      .num = 4, .level = 0},  /* Space / Enter */ \
+    {RG_KEY_B,      .num = 5, .level = 0},  /* Backspace */ \
+    {RG_KEY_SELECT, .num = 6, .level = 0},  /* Alt / Sym */ \
+    {RG_KEY_START,  .num = 7, .level = 0},  /* Micro-knap / Center */ \
+    {RG_KEY_MENU,   .num = 8, .level = 0},  /* Sideknap / Speaker */ \
 }
 
 #define RG_RECOVERY_BTN             RG_KEY_START
