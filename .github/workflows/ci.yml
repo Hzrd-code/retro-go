@@ -40,6 +40,13 @@ jobs:
         docker run --rm -v $(pwd)/build:/out retro-go:latest sh -c "find /app -name '*.bin' -exec cp {} /out/ \;"
         ls -la $(pwd)/build
 
+    - name: Merge binaries to single firmware file
+      run: |
+        python3 -m pip install esptool
+        cd $(pwd)/build
+        esptool.py --chip esp32s3 merge_bin -o retrogo-tdeck-full.bin 0x0 bootloader.bin 0x8000 partition-table.bin 0x10000 launcher.bin
+        ls -lh retrogo-tdeck-full.bin
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
