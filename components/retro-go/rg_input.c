@@ -108,27 +108,53 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
     uint32_t state = 0;
 
 #ifdef ESP_PLATFORM
-    // 1. Tving strøm på T-Deck periferi (GPIO 46)
-    gpio_set_direction(GPIO_NUM_46, GPIO_MODE_OUTPUT);
-    gpio_set_level(GPIO_NUM_46, 1);
+    static bool init_done = false;
+    if (!init_done)
+    {
+        // 1. Tving strøm på BEGGE tænkelige Power-pinde (GPIO 46 OG GPIO 10)
+        gpio_reset_pin(GPIO_NUM_46);
+        gpio_set_direction(GPIO_NUM_46, GPIO_MODE_OUTPUT);
+        gpio_set_level(GPIO_NUM_46, 1);
 
-    // 2. LÆS TASTATUR (TCA9555 på I2C 0x20)
-    // T-Deck Tastatur: Port 0 og Port 1 input-registre
+        gpio_reset_pin(GPIO_NUM_10);
+        gpio_set_direction(GPIO_NUM_10, GPIO_MODE_OUTPUT);
+        gpio_set_level(GPIO_NUM_10, 1);
+
+        // 2. Tving stærke Pull-ups på I2C pinde (SDA: 18, SCL: 8) for at fjerne støj
+        gpio_set_pull_mode(GPIO_NUM_18, GPIO_PULLUP_ONLY);
+        gpio_set_pull_mode(GPIO_NUM_8, GPIO_PULLUP_ONLY);
+
+        // 3. Deaktiver trackball-pinde helt, så de IKKE støjer
+        const gpio_num_t tb_pins[] = {GPIO_NUM_0, GPIO_NUM_1, GPIO_NUM_2, GPIO_NUM_3, GPIO_NUM_15};
+        for (int i = 0; i < 5; i++) {
+            gpio_reset_pin(tb_pins[i]);
+            gpio_set_direction(tb_pins[i], GPIO_MODE_INPUT);
+            gpio_set_pull_mode(tb_pins[i], GPIO_PULLUP_ONLY);
+        }
+
+        // 4. Konfigurer TCA9555 IO-expander til INPUT mode
+        uint8_t cfg[2] = {0xFF, 0xFF};
+        rg_i2c_write(0x20, 0x06, &cfg[0], 1); // Port 0 config = Input
+        rg_i2c_write(0x20, 0x07, &cfg[1], 1); // Port 1 config = Input
+
+        init_done = true;
+    }
+
+    // --- LÆS KUN TASTATUR (TCA9555 over I2C 0x20) ---
     uint8_t data[2] = {0xFF, 0xFF};
 
-    // Prøv at læse input-registrene (0x00)
+    // Prøv at læse input registrene (0x00 og 0x01)
     if (rg_i2c_read(0x20, 0x00, data, 2))
     {
-        // TCA9555 trækker pinde LOW når en knap trykkes ind
         uint16_t raw_keys = ~(data[0] | (data[1] << 8));
 
-        // T-Deck tastatur matrix knapper
+        // Tastatur Navigation (W, A, S, D, Space, Enter)
         if (raw_keys & (1 << 0))  state |= RG_KEY_UP;       // W
         if (raw_keys & (1 << 1))  state |= RG_KEY_DOWN;     // S
         if (raw_keys & (1 << 2))  state |= RG_KEY_LEFT;     // A
         if (raw_keys & (1 << 3))  state |= RG_KEY_RIGHT;    // D
-        if (raw_keys & (1 << 4))  state |= RG_KEY_A;        // Space
-        if (raw_keys & (1 << 5))  state |= RG_KEY_B;        // Enter / L
+        if (raw_keys & (1 << 4))  state |= RG_KEY_A;        // Space (Vælg / A)
+        if (raw_keys & (1 << 5))  state |= RG_KEY_B;        // Enter / L (Tilbage / B)
         if (raw_keys & (1 << 6))  state |= RG_KEY_SELECT;   // Sym
         if (raw_keys & (1 << 7))  state |= RG_KEY_START;    // Alt
         if (raw_keys & (1 << 8))  state |= RG_KEY_MENU;     // Esc
