@@ -107,18 +107,30 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
 {
     uint32_t state = 0;
 
-#if defined(RG_GAMEPAD_ADC_MAP)
-    static int old_adc_values[RG_COUNT(keymap_adc)];
-    for (size_t i = 0; i < RG_COUNT(keymap_adc); ++i)
+#ifdef ESP_PLATFORM
+    // 1. Læs Trackball (Direkte GPIOs for Standard T-Deck)
+    if (gpio_get_level(GPIO_NUM_3) == 0)  state |= RG_KEY_UP;
+    if (gpio_get_level(GPIO_NUM_15) == 0) state |= RG_KEY_DOWN;
+    if (gpio_get_level(GPIO_NUM_1) == 0)  state |= RG_KEY_LEFT;
+    if (gpio_get_level(GPIO_NUM_2) == 0)  state |= RG_KEY_RIGHT;
+    if (gpio_get_level(GPIO_NUM_0) == 0)  state |= RG_KEY_A; // Trackball-klik
+
+    // 2. Læs Tastatur (TCA9555 over I2C)
+    uint8_t data[2] = {0xFF, 0xFF};
+    if (rg_i2c_read(0x20, 0x00, data, 2))
     {
-        const rg_keymap_adc_t *mapping = &keymap_adc[i];
-        int value = adc_get_raw(mapping->unit, mapping->channel);
-        if (value >= mapping->min && value <= mapping->max)
-        {
-            if (abs(old_adc_values[i] - value) < RG_GAMEPAD_ADC_FILTER_WINDOW)
-                state |= mapping->key;
-            old_adc_values[i] = value;
-        }
+        uint16_t raw_keys = ~(data[0] | (data[1] << 8));
+
+        // Standard T-Deck Tastatur matrix-mapping
+        if (raw_keys & (1 << 0))  state |= RG_KEY_UP;       // W / Up
+        if (raw_keys & (1 << 1))  state |= RG_KEY_DOWN;     // S / Down
+        if (raw_keys & (1 << 2))  state |= RG_KEY_LEFT;     // A / Left
+        if (raw_keys & (1 << 3))  state |= RG_KEY_RIGHT;    // D / Right
+        if (raw_keys & (1 << 4))  state |= RG_KEY_A;        // Space / K
+        if (raw_keys & (1 << 5))  state |= RG_KEY_B;        // L / Enter
+        if (raw_keys & (1 << 6))  state |= RG_KEY_SELECT;   // Sym
+        if (raw_keys & (1 << 7))  state |= RG_KEY_START;    // Alt
+        if (raw_keys & (1 << 8))  state |= RG_KEY_MENU;     // Micro-button / ESC
     }
 #endif
 
@@ -128,77 +140,6 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
         const rg_keymap_gpio_t *mapping = &keymap_gpio[i];
         if (gpio_get_level(mapping->num) == mapping->level)
             state |= mapping->key;
-    }
-#endif
-
-#if defined(RG_GAMEPAD_I2C_MAP)
-    uint32_t buttons = 0;
-#if defined(RG_I2C_GPIO_DRIVER)
-    int data0 = rg_i2c_gpio_read_port(0), data1 = rg_i2c_gpio_read_port(1);
-    if (data0 > -1)
-    {
-        buttons = (data1 << 8) | (data0);
-    }
-#else
-    uint8_t data[2] = {0xFF, 0xFF};
-    // Standard T-Deck: Læs 2 bytes fra TCA9555 tastatur på 0x20
-    if (rg_i2c_read(0x20, 0x00, data, 2))
-    {
-        buttons = ~(data[0] | (data[1] << 8));
-    }
-#endif
-    for (size_t i = 0; i < RG_COUNT(keymap_i2c); ++i)
-    {
-        const rg_keymap_i2c_t *mapping = &keymap_i2c[i];
-        if (((buttons >> mapping->num) & 1) == mapping->level)
-            state |= mapping->key;
-    }
-#endif
-
-#if defined(RG_GAMEPAD_KBD_MAP)
-#ifdef RG_TARGET_SDL2
-    int numkeys = 0;
-    const uint8_t *keys = SDL_GetKeyboardState(&numkeys);
-    for (size_t i = 0; i < RG_COUNT(keymap_kbd); ++i)
-    {
-        const rg_keymap_kbd_t *mapping = &keymap_kbd[i];
-        if (mapping->src < 0 || mapping->src >= numkeys)
-            continue;
-        if (keys[mapping->src])
-            state |= mapping->key;
-    }
-#else
-#warning "not implemented"
-#endif
-#endif
-
-#if defined(RG_GAMEPAD_SERIAL_MAP)
-    gpio_set_level(RG_GPIO_GAMEPAD_LATCH, 0);
-    rg_usleep(5);
-    gpio_set_level(RG_GPIO_GAMEPAD_LATCH, 1);
-    rg_usleep(1);
-    uint32_t buttons = 0;
-    for (int i = 0; i < 16; i++)
-    {
-        buttons |= gpio_get_level(RG_GPIO_GAMEPAD_DATA) << (15 - i);
-        gpio_set_level(RG_GPIO_GAMEPAD_CLOCK, 0);
-        rg_usleep(1);
-        gpio_set_level(RG_GPIO_GAMEPAD_CLOCK, 1);
-        rg_usleep(1);
-    }
-    for (size_t i = 0; i < RG_COUNT(keymap_serial); ++i)
-    {
-        const rg_keymap_serial_t *mapping = &keymap_serial[i];
-        if (((buttons >> mapping->num) & 1) == mapping->level)
-            state |= mapping->key;
-    }
-#endif
-
-#if defined(RG_GAMEPAD_VIRT_MAP)
-    for (size_t i = 0; i < RG_COUNT(keymap_virt); ++i)
-    {
-        if (state == keymap_virt[i].src)
-            state = keymap_virt[i].key;
     }
 #endif
 
