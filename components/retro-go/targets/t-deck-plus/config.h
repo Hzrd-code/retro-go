@@ -6,19 +6,17 @@
 #define RG_STORAGE_SDSPI_HOST       SPI2_HOST
 #define RG_STORAGE_SDSPI_SPEED      SDMMC_FREQ_DEFAULT
 
-// GPIO Extender (TCA9555 på T-Deck Plus)
-#define RG_I2C_GPIO_DRIVER          1
-#define RG_I2C_GPIO_ADDR            0x20
+// T-Keyboard ESP32-C3 Co-Processor over I2C
+#define T_DECK_KBD_ADDRESS          0x55
+#define T_DECK_KBD_MODE_RAW_CMD     0x03
 
 // Audio
 #define RG_AUDIO_USE_INT_DAC        0
 #define RG_AUDIO_USE_EXT_DAC        1
 
-// Board-specific (Power control)
+// Board-specific (Power control & TP Reset)
 #define T_DECK_BOARD_POWER          GPIO_NUM_10
 #define T_DECK_RADIO_CS             GPIO_NUM_9
-
-// Touch & Keypad Reset Pin
 #define RG_GPIO_TP_RST              GPIO_NUM_46
 
 #define RG_CUSTOM_PLATFORM_INIT()                               \
@@ -35,7 +33,7 @@
     gpio_set_pull_mode(RG_GPIO_SDSPI_MISO, GPIO_PULLUP_ONLY); \
     rg_task_delay(50);
 
-// Video (ST7789 / ILI9341 Display init)
+// Video (ST7789 / ILI9341 Display)
 #define RG_SCREEN_DRIVER            0
 #define RG_SCREEN_HOST              SPI2_HOST
 #define RG_SCREEN_SPEED             SPI_MASTER_FREQ_80M
@@ -65,11 +63,11 @@
     ILI9341_CMD(0xE0, 0xD0, 0x00, 0x02, 0x07, 0x0a, 0x28, 0x32, 0x44, 0x42, 0x06, 0x0e, 0x12, 0x14, 0x17);       \
     ILI9341_CMD(0xE1, 0xD0, 0x00, 0x02, 0x07, 0x0a, 0x28, 0x31, 0x54, 0x47, 0x0E, 0x1C, 0x17, 0x1b, 0x1e);       \
 
-// Anti-flicker / Debounce for Trackball
+// Smooth Trackball / Debounce
 #define RG_GAMEPAD_DEBOUNCE_PRESS   4
 #define RG_GAMEPAD_DEBOUNCE_RELEASE 4
 
-// Trackball (GPIO inputs)
+// Trackball Direct GPIO Mapping
 #define RG_GAMEPAD_GPIO_MAP { \
     {RG_KEY_UP,    .num = GPIO_NUM_3,  .pullup = 1, .level = 0},\
     {RG_KEY_DOWN,  .num = GPIO_NUM_15, .pullup = 1, .level = 0},\
@@ -78,20 +76,7 @@
     {RG_KEY_A,     .num = GPIO_NUM_0,  .pullup = 1, .level = 0},\
 }
 
-// Keypad (I2C expander map for T-Deck Plus)
-#define RG_GAMEPAD_I2C_MAP { \
-    {RG_KEY_UP,     .num = 0, .level = 0},\
-    {RG_KEY_DOWN,   .num = 1, .level = 0},\
-    {RG_KEY_LEFT,   .num = 2, .level = 0},\
-    {RG_KEY_RIGHT,  .num = 3, .level = 0},\
-    {RG_KEY_A,      .num = 4, .level = 0},\
-    {RG_KEY_B,      .num = 5, .level = 0},\
-    {RG_KEY_SELECT, .num = 6, .level = 0},\
-    {RG_KEY_START,  .num = 7, .level = 0},\
-    {RG_KEY_MENU,   .num = 8, .level = 0},\
-}
-
-#define RG_RECOVERY_BTN             RG_KEY_START
+#define RG_RECOVERY_BTN             -1
 
 // Battery
 #define RG_BATTERY_DRIVER           1
@@ -100,7 +85,7 @@
 #define RG_BATTERY_CALC_PERCENT(raw) (((raw) * 2.f - 3500.f) / (4200.f - 3500.f) * 100.f)
 #define RG_BATTERY_CALC_VOLTAGE(raw) ((raw) * 2.f * 0.001f)
 
-// I2C BUS
+// I2C BUS (T-Keyboard)
 #define RG_GPIO_I2C_SDA             GPIO_NUM_18
 #define RG_GPIO_I2C_SCL             GPIO_NUM_8
 
@@ -118,7 +103,7 @@
 #define RG_GPIO_SDSPI_CLK           GPIO_NUM_40
 #define RG_GPIO_SDSPI_CS            GPIO_NUM_39
 
-// External I2S DAC
+// External I2S DAC Audio
 #define RG_GPIO_SND_I2S_BCK         GPIO_NUM_7
 #define RG_GPIO_SND_I2S_WS          GPIO_NUM_5
 #define RG_GPIO_SND_I2S_DATA        GPIO_NUM_6
