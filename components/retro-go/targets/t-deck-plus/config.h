@@ -7,8 +7,8 @@
 #define RG_STORAGE_SDSPI_SPEED      SDMMC_FREQ_DEFAULT
 
 // GPIO Extender (Deaktiveret midlertidigt for at undgå at tastaturet låser menuen)
-#define RG_I2C_GPIO_DRIVER          0
-#define RG_I2C_GPIO_ADDR            0x00
+#define RG_I2C_GPIO_DRIVER          1
+#define RG_I2C_GPIO_ADDR            0x20
 
 // Audio
 #define RG_AUDIO_USE_INT_DAC        0
