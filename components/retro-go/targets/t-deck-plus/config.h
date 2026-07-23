@@ -70,11 +70,10 @@
     {RG_KEY_RIGHT,   .num = 'd', .level = 1},\
     {RG_KEY_A,       .num = 'j', .level = 1},\
     {RG_KEY_B,       .num = 'k', .level = 1},\
-    {RG_KEY_START,   .num = 13,  .level = 1},\ /* Enter */ \
-    {RG_KEY_SELECT,  .num = ' ', .level = 1},\ /* Space */ \
+    {RG_KEY_START,   .num = 13,  .level = 1},\
+    {RG_KEY_SELECT,  .num = ' ', .level = 1},\
     {RG_KEY_MENU,    .num = 'm', .level = 1},\
 }
-
 #define RG_GAMEPAD_GPIO_MAP { \
     {RG_KEY_MENU, .num = GPIO_NUM_0, .pullup = 1, .level = 0},\
 }
