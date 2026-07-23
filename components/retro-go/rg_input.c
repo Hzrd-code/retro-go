@@ -108,38 +108,33 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
     uint32_t state = 0;
 
 #ifdef ESP_PLATFORM
-    // 1. Læs Trackball (Direkte GPIOs for Standard T-Deck)
+    // Tving strøm på T-Deck periferi (GPIO 46)
+    gpio_set_level(GPIO_NUM_46, 1);
+
+    // 1. LÆS TRACKBALL (Direkte GPIOs - Standard T-Deck)
     if (gpio_get_level(GPIO_NUM_3) == 0)  state |= RG_KEY_UP;
     if (gpio_get_level(GPIO_NUM_15) == 0) state |= RG_KEY_DOWN;
     if (gpio_get_level(GPIO_NUM_1) == 0)  state |= RG_KEY_LEFT;
     if (gpio_get_level(GPIO_NUM_2) == 0)  state |= RG_KEY_RIGHT;
     if (gpio_get_level(GPIO_NUM_0) == 0)  state |= RG_KEY_A; // Trackball-klik
 
-    // 2. Læs Tastatur (TCA9555 over I2C)
+    // 2. LÆS TASTATUR (TCA9555 på I2C 0x20)
     uint8_t data[2] = {0xFF, 0xFF};
-    if (rg_i2c_read(0x20, 0x00, data, 2))
+    if (rg_i2c_read(0x20, 0x00, data, 2) || rg_i2c_read(0x20, -1, data, 2))
     {
         uint16_t raw_keys = ~(data[0] | (data[1] << 8));
 
-        // Standard T-Deck Tastatur matrix-mapping
-        if (raw_keys & (1 << 0))  state |= RG_KEY_UP;       // W / Up
-        if (raw_keys & (1 << 1))  state |= RG_KEY_DOWN;     // S / Down
-        if (raw_keys & (1 << 2))  state |= RG_KEY_LEFT;     // A / Left
-        if (raw_keys & (1 << 3))  state |= RG_KEY_RIGHT;    // D / Right
-        if (raw_keys & (1 << 4))  state |= RG_KEY_A;        // Space / K
-        if (raw_keys & (1 << 5))  state |= RG_KEY_B;        // L / Enter
-        if (raw_keys & (1 << 6))  state |= RG_KEY_SELECT;   // Sym
-        if (raw_keys & (1 << 7))  state |= RG_KEY_START;    // Alt
-        if (raw_keys & (1 << 8))  state |= RG_KEY_MENU;     // Micro-button / ESC
-    }
-#endif
-
-#if defined(RG_GAMEPAD_GPIO_MAP)
-    for (size_t i = 0; i < RG_COUNT(keymap_gpio); ++i)
-    {
-        const rg_keymap_gpio_t *mapping = &keymap_gpio[i];
-        if (gpio_get_level(mapping->num) == mapping->level)
-            state |= mapping->key;
+        if (raw_keys != 0) {
+            if (raw_keys & (1 << 0))  state |= RG_KEY_UP;       // W
+            if (raw_keys & (1 << 1))  state |= RG_KEY_DOWN;     // S
+            if (raw_keys & (1 << 2))  state |= RG_KEY_LEFT;     // A
+            if (raw_keys & (1 << 3))  state |= RG_KEY_RIGHT;    // D
+            if (raw_keys & (1 << 4))  state |= RG_KEY_A;        // Space
+            if (raw_keys & (1 << 5))  state |= RG_KEY_B;        // Enter / L
+            if (raw_keys & (1 << 6))  state |= RG_KEY_SELECT;   // Sym
+            if (raw_keys & (1 << 7))  state |= RG_KEY_START;    // Alt
+            if (raw_keys & (1 << 8))  state |= RG_KEY_MENU;     // Esc
+        }
     }
 #endif
 
