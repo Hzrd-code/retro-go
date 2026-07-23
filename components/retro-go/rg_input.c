@@ -42,7 +42,7 @@ static uint32_t gamepad_state = -1; // _Atomic
 static uint32_t gamepad_mapped = 0;
 static rg_battery_t battery_state = {0};
 
-#define UPDATE_GLOBAL_MAP(keymap)                   \
+#define UPDATE_GLOBAL_MAP(keymap)                 \
     for (size_t i = 0; i < RG_COUNT(keymap); ++i) \
         gamepad_mapped |= keymap[i].key;          \
 
@@ -81,15 +81,17 @@ static uint32_t rg_input_read_i2c_gamepad(void)
 {
     uint32_t state = 0;
 #if defined(RG_GAMEPAD_I2C_MAP)
-    uint8_t data[5];
-    if (rg_i2c_read(T_DECK_KBD_ADDRESS, -1, &data, 5))
+    uint8_t data[5] = {0};
+    if (rg_i2c_read(T_DECK_KBD_ADDRESS, T_DECK_KBD_MODE_RAW_CMD, &data, 5))
     {
-        uint32_t buttons = (data[2] << 8) | (data[1]);
         for (size_t i = 0; i < RG_COUNT(keymap_i2c); ++i)
         {
             const rg_keymap_i2c_t *mapping = &keymap_i2c[i];
-            if (((buttons >> mapping->num) & 1) == mapping->level)
-                state |= mapping->key;
+            for (int j = 0; j < 5; ++j)
+            {
+                if (data[j] == mapping->num)
+                    state |= mapping->key;
+            }
         }
     }
 #endif
