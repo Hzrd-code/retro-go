@@ -26,9 +26,6 @@ static rg_keymap_gpio_t keymap_gpio[] = RG_GAMEPAD_GPIO_MAP;
 #ifdef RG_GAMEPAD_I2C_MAP
 static rg_keymap_i2c_t keymap_i2c[] = RG_GAMEPAD_I2C_MAP;
 #endif
-#ifdef RG_GAMEPAD_KBD_MAP
-static rg_keymap_kbd_t keymap_kbd[] = RG_GAMEPAD_KBD_MAP;
-#endif
 #ifdef RG_GAMEPAD_SERIAL_MAP
 static rg_keymap_serial_t keymap_serial[] = RG_GAMEPAD_SERIAL_MAP;
 #endif
@@ -124,35 +121,43 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
 #endif
 
 #if defined(RG_GAMEPAD_I2C_MAP)
-    uint32_t buttons = 0;
-    uint8_t data[5];
 #if defined(RG_TARGET_QTPY_GAMER)
-    buttons = ~(rg_i2c_gpio_read_port(0) | rg_i2c_gpio_read_port(1) << 8);
-#else
-    if (rg_i2c_read(0x20, -1, &data, 5))
-        buttons = ~((data[2] << 8) | data[1]);
-#endif
-    for (size_t i = 0; i < RG_COUNT(keymap_i2c); ++i)
     {
-        if ((buttons & keymap_i2c[i].src) == keymap_i2c[i].src)
-            state |= keymap_i2c[i].key;
+        uint32_t buttons = ~(rg_i2c_gpio_read_port(0) | rg_i2c_gpio_read_port(1) << 8);
+        for (size_t i = 0; i < RG_COUNT(keymap_i2c); ++i)
+        {
+            const rg_keymap_i2c_t *mapping = &keymap_i2c[i];
+            if (((buttons >> mapping->num) & 1) == (uint32_t)mapping->level)
+                state |= mapping->key;
+        }
     }
-#endif
-
-#if defined(RG_GAMEPAD_KBD_MAP)
-#ifdef RG_TARGET_SDL2
-    int numkeys = 0;
-    const uint8_t *keys = SDL_GetKeyboardState(&numkeys);
-    for (size_t i = 0; i < RG_COUNT(keymap_kbd); ++i)
+#elif defined(RG_TARGET_T_DECK_PLUS)
+    // T-Deck keyboard reports a single ASCII scancode byte over I2C
     {
-        const rg_keymap_kbd_t *mapping = &keymap_kbd[i];
-        if (mapping->src < 0 || mapping->src >= numkeys)
-            continue;
-        if (keys[mapping->src])
-            state |= mapping->key;
+        uint8_t scancode = 0;
+        if (rg_i2c_read(T_DECK_KBD_ADDRESS, -1, &scancode, 1) && scancode != 0)
+        {
+            for (size_t i = 0; i < RG_COUNT(keymap_i2c); ++i)
+            {
+                const rg_keymap_i2c_t *mapping = &keymap_i2c[i];
+                if (scancode == mapping->num)
+                    state |= mapping->key;
+            }
+        }
     }
 #else
-#warning "not implemented"
+    {
+        uint8_t data[5];
+        uint32_t buttons = 0;
+        if (rg_i2c_read(0x20, -1, &data, 5))
+            buttons = ~((data[2] << 8) | data[1]);
+        for (size_t i = 0; i < RG_COUNT(keymap_i2c); ++i)
+        {
+            const rg_keymap_i2c_t *mapping = &keymap_i2c[i];
+            if (((buttons >> mapping->num) & 1) == (uint32_t)mapping->level)
+                state |= mapping->key;
+        }
+    }
 #endif
 #endif
 
@@ -161,10 +166,10 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
     rg_usleep(5);
     gpio_set_level(RG_GPIO_GAMEPAD_LATCH, 1);
     rg_usleep(1);
-    uint32_t buttons = 0;
+    uint32_t serial_buttons = 0;
     for (int i = 0; i < 16; i++)
     {
-        buttons |= gpio_get_level(RG_GPIO_GAMEPAD_DATA) << (15 - i);
+        serial_buttons |= gpio_get_level(RG_GPIO_GAMEPAD_DATA) << (15 - i);
         gpio_set_level(RG_GPIO_GAMEPAD_CLOCK, 0);
         rg_usleep(1);
         gpio_set_level(RG_GPIO_GAMEPAD_CLOCK, 1);
@@ -172,8 +177,9 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
     }
     for (size_t i = 0; i < RG_COUNT(keymap_serial); ++i)
     {
-        if ((buttons & keymap_serial[i].src) == keymap_serial[i].src)
-            state |= keymap_serial[i].src;
+        const rg_keymap_serial_t *mapping = &keymap_serial[i];
+        if (((serial_buttons >> mapping->num) & 1) == (uint32_t)mapping->level)
+            state |= mapping->key;
     }
 #endif
 
@@ -268,8 +274,13 @@ void rg_input_init(void)
     for (size_t i = 0; i < RG_COUNT(keymap_gpio); ++i)
     {
         const rg_keymap_gpio_t *mapping = &keymap_gpio[i];
+        gpio_pull_mode_t pull = GPIO_FLOATING;
+        if (mapping->pullup)
+            pull = GPIO_PULLUP_ONLY;
+        else if (mapping->pulldown)
+            pull = GPIO_PULLDOWN_ONLY;
         gpio_set_direction(mapping->num, GPIO_MODE_INPUT);
-        gpio_set_pull_mode(mapping->num, mapping->pull);
+        gpio_set_pull_mode(mapping->num, pull);
     }
     UPDATE_GLOBAL_MAP(keymap_gpio);
 #endif
@@ -281,11 +292,6 @@ void rg_input_init(void)
     rg_i2c_gpio_init();
 #endif
     UPDATE_GLOBAL_MAP(keymap_i2c);
-#endif
-
-#if defined(RG_GAMEPAD_KBD_MAP)
-    RG_LOGI("Initializing KBD gamepad driver...");
-    UPDATE_GLOBAL_MAP(keymap_kbd);
 #endif
 
 #if defined(RG_GAMEPAD_SERIAL_MAP)
@@ -349,6 +355,11 @@ bool rg_input_key_is_pressed(rg_key_t mask)
     return (bool)(rg_input_read_gamepad() & mask);
 }
 
+bool rg_input_key_is_present(rg_key_t mask)
+{
+    return (gamepad_mapped & mask) == mask;
+}
+
 bool rg_input_wait_for_key(rg_key_t mask, bool pressed, int timeout_ms)
 {
     int64_t expiration = timeout_ms < 0 ? INT64_MAX : (rg_system_timer() + timeout_ms * 1000);
@@ -387,70 +398,4 @@ const char *rg_input_get_key_name(rg_key_t key)
     case RG_KEY_NONE: return "None";
     default: return "Unknown";
     }
-}
-
-const char *rg_input_get_key_mapping(rg_key_t key)
-{
-    if ((gamepad_mapped & key) == key)
-        return "PHYSICAL";
-    return NULL;
-}
-
-const rg_keyboard_map_t virtual_map1 = {
-    .columns = 10,
-    .rows = 4,
-    .data = {
-        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
-        'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
-        'U', 'V', 'W', 'X', 'Y', 'Z', ' ', ',', '.', ' ',
-    }
-};
-
-int rg_input_read_keyboard(const rg_keyboard_map_t *map)
-{
-    int cursor = -1;
-    int count = map->columns * map->rows;
-
-    if (!map)
-        map = &virtual_map1;
-
-    rg_input_wait_for_key(RG_KEY_ALL, false, 1000);
-
-    while (1)
-    {
-        uint32_t joystick = rg_input_read_gamepad();
-        int prev_cursor = cursor;
-
-        if (joystick & RG_KEY_A)
-            return map->data[cursor];
-        if (joystick & RG_KEY_B)
-            break;
-
-        if (joystick & RG_KEY_LEFT)
-            cursor--;
-        if (joystick & RG_KEY_RIGHT)
-            cursor++;
-        if (joystick & RG_KEY_UP)
-            cursor -= map->columns;
-        if (joystick & RG_KEY_DOWN)
-            cursor += map->columns;
-
-        if (cursor > count - 1)
-            cursor = prev_cursor;
-        else if (cursor < 0)
-            cursor = prev_cursor;
-
-        cursor = RG_MIN(RG_MAX(cursor, 0), count - 1);
-
-        if (cursor != prev_cursor)
-            rg_gui_draw_keyboard(map, cursor);
-
-        rg_input_wait_for_key(RG_KEY_ALL, false, 500);
-        rg_input_wait_for_key(RG_KEY_ANY, true, 500);
-
-        rg_system_tick(0);
-    }
-
-    return -1;
 }
