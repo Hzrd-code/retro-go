@@ -101,6 +101,7 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
 {
     uint32_t state = 0;
 
+/*
 #if defined(RG_GAMEPAD_ADC_MAP)
     for (size_t i = 0; i < RG_COUNT(keymap_adc); ++i)
     {
@@ -119,6 +120,7 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
             state |= mapping->key;
     }
 #endif
+*/
 
 #if defined(RG_GAMEPAD_I2C_MAP)
 #if defined(RG_TARGET_QTPY_GAMER)
