@@ -7,8 +7,8 @@
 #define RG_STORAGE_SDSPI_SPEED      SDMMC_FREQ_DEFAULT
 
 // GPIO Extender
-#define RG_I2C_GPIO_DRIVER          2   // 2 = TCA9555 / PCF9539 til T-Deck Keyboard
-#define RG_I2C_GPIO_ADDR            T_DECK_KBD_ADDRESS
+// #define RG_I2C_GPIO_DRIVER          2   // 2 = TCA9555 / PCF9539 til T-Deck Keyboard
+// #define RG_I2C_GPIO_ADDR            T_DECK_KBD_ADDRESS
 
 // Audio
 #define RG_AUDIO_USE_INT_DAC        0   // 0 = Disable, 1 = GPIO25, 2 = GPIO26, 3 = Both
