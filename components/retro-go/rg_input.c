@@ -135,8 +135,12 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
     // T-Deck keyboard reports a single ASCII scancode byte over I2C
     {
         uint8_t scancode = 0;
-        if (rg_i2c_read(T_DECK_KBD_ADDRESS, -1, &scancode, 1) && scancode != 0)
+        bool ok = rg_i2c_read(T_DECK_KBD_ADDRESS, -1, &scancode, 1);
+        if (!ok)
+            RG_LOGE("KBD i2c read FAILED");
+        else if (scancode != 0)
         {
+            RG_LOGI("KBD scancode: 0x%02X ('%c')", scancode, scancode);
             for (size_t i = 0; i < RG_COUNT(keymap_i2c); ++i)
             {
                 const rg_keymap_i2c_t *mapping = &keymap_i2c[i];
