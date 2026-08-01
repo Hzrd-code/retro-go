@@ -131,23 +131,34 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
                 state |= mapping->key;
         }
     }
-#elif defined(RG_TARGET_T_DECK_PLUS)
-    // T-Deck keyboard reports a single ASCII scancode byte over I2C
+    #elif defined(RG_TARGET_T_DECK_PLUS)
+    // T-Deck keyboard reports ASCII scancode bytes over I2C
     {
+        static uint32_t last_kbd_state = 0;
         uint8_t scancode = 0;
         bool ok = rg_i2c_read(T_DECK_KBD_ADDRESS, -1, &scancode, 1);
-        if (!ok)
-            RG_LOGE("KBD i2c read FAILED");
-        else if (scancode != 0)
+        
+        if (ok && scancode != 0)
         {
             RG_LOGI("KBD scancode: 0x%02X ('%c')", scancode, scancode);
-            for (size_t i = 0; i < RG_COUNT(keymap_i2c); ++i)
+            uint32_t kbd_key = 0;
+            switch (scancode)
             {
-                const rg_keymap_i2c_t *mapping = &keymap_i2c[i];
-                if (scancode == mapping->num)
-                    state |= mapping->key;
+                case 'w': case 'W': kbd_key = RG_KEY_UP; break;
+                case 's': case 'S': kbd_key = RG_KEY_DOWN; break;
+                case 'a': case 'A': kbd_key = RG_KEY_LEFT; break;
+                case 'd': case 'D': kbd_key = RG_KEY_RIGHT; break;
+                case 'j': case 'J': kbd_key = RG_KEY_A; break;
+                case 'k': case 'K': kbd_key = RG_KEY_B; break;
+                case 'm': case 'M': kbd_key = RG_KEY_MENU; break;
+                case ' ':          kbd_key = RG_KEY_START; break;
+                case 0x0D:         kbd_key = RG_KEY_SELECT; break; // Enter key
+                case 0x08:         kbd_key = RG_KEY_B; break;      // Backspace key
             }
+            if (kbd_key)
+                last_kbd_state ^= kbd_key; // Toggle key state on press
         }
+        state |= last_kbd_state;
     }
 #else
     {
