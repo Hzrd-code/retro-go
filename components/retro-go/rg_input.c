@@ -134,8 +134,10 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
     #elif defined(RG_TARGET_T_DECK_PLUS)
     // T-Deck keyboard reports ASCII scancode bytes over I2C
     {
-        static uint32_t last_kbd_state = 0;
+        static uint32_t active_keys = 0;
+        static int key_hold_timer = 0;
         uint8_t scancode = 0;
+
         bool ok = rg_i2c_read(T_DECK_KBD_ADDRESS, -1, &scancode, 1);
         
         if (ok && scancode != 0)
@@ -155,10 +157,23 @@ bool rg_input_read_gamepad_raw(uint32_t *out)
                 case 0x0D:         kbd_key = RG_KEY_SELECT; break; // Enter key
                 case 0x08:         kbd_key = RG_KEY_B; break;      // Backspace key
             }
+            
             if (kbd_key)
-                last_kbd_state ^= kbd_key; // Toggle key state on press
+            {
+                active_keys = kbd_key;
+                key_hold_timer = 6; // Keep key active for ~60ms (6 loops) so Retro-Go registers it cleanly
+            }
         }
-        state |= last_kbd_state;
+
+        if (key_hold_timer > 0)
+        {
+            state |= active_keys;
+            key_hold_timer--;
+        }
+        else
+        {
+            active_keys = 0;
+        }
     }
 #else
     {
