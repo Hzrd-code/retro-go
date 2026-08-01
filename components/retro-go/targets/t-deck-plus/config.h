@@ -75,7 +75,11 @@
     {RG_KEY_MENU,    .num = 'm', .level = 1},\
 }
 #define RG_GAMEPAD_GPIO_MAP { \
-    {RG_KEY_MENU, .num = GPIO_NUM_0, .pullup = 1, .level = 0},\
+    {RG_KEY_MENU,  .num = GPIO_NUM_0,  .pullup = 1, .level = 0},\
+    {RG_KEY_UP,    .num = GPIO_NUM_3,  .pullup = 1, .level = 0},\
+    {RG_KEY_DOWN,  .num = GPIO_NUM_15, .pullup = 1, .level = 0},\
+    {RG_KEY_LEFT,  .num = GPIO_NUM_1,  .pullup = 1, .level = 0},\
+    {RG_KEY_RIGHT, .num = GPIO_NUM_2,  .pullup = 1, .level = 0},\
 }
 
 #define RG_RECOVERY_BTN             RG_KEY_MENU
