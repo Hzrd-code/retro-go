@@ -352,6 +352,19 @@ static void enter_recovery_mode(void)
 static void platform_init(void)
 {
 #if defined(ESP_PLATFORM)
+    // --- POWER ENABLE FOR T-DECK PERIPHERALS ---
+    gpio_config_t pwr_conf = {
+        .pin_bit_mask = (1ULL << GPIO_NUM_10) | (1ULL << GPIO_NUM_12),
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&pwr_conf);
+    gpio_set_level(GPIO_NUM_10, 1);
+    gpio_set_level(GPIO_NUM_12, 1);
+    // -------------------------------------------
+    
     // At boot time those pins are muxed to JTAG and can interfere with other things.
     #if CONFIG_IDF_TARGET_ESP32
         gpio_reset_pin(GPIO_NUM_12);
