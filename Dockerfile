@@ -12,4 +12,4 @@ RUN cd /opt/esp/idf && \
 # Kør reconfigure for at bage alle cores ind i launcheren (All-In-One)
 SHELL ["/bin/bash", "-c"]
 RUN . /opt/esp/idf/export.sh && \
-    python rg_tool.py --target=t-deck-plus build-img all CONFIG_RETRO_GO_BUILD_TYPE_ALL_IN_ONE=y
+    python rg_tool.py --target=t-deck-plus --config=CONFIG_RETRO_GO_BUILD_TYPE_ALL_IN_ONE=y build-img all
