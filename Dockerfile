@@ -9,7 +9,7 @@ RUN cd /opt/esp/idf && \
 	patch --ignore-whitespace -p1 -i "/app/tools/patches/panic-hook (esp-idf 4).diff" && \
 	patch --ignore-whitespace -p1 -i "/app/tools/patches/sdcard-fix (esp-idf 4).diff"
 
-# Build og generer det komplette factory image (med ALLE emulatorer indbygget)
+# Build .fw filer direkte til M5Launcher
 SHELL ["/bin/bash", "-c"]
 RUN . /opt/esp/idf/export.sh && \
-    python rg_tool.py --target=t-deck-plus build-img all
+    python rg_tool.py --target=t-deck-plus build-fw all
