@@ -1,15 +1,13 @@
-name: ci
+name: Build Retro-Go for M5Launcher
 
 on:
-  workflow_dispatch:      # Start a workflow
+  workflow_dispatch:
   push:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-    # Remove ~18 GiB of preinstalled software to have more disk space during the build
     - name: Cleanup runner
       run: |
         df -h
@@ -19,8 +17,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+    - name: Set up Docker Buildx      uses: docker/setup-buildx-action@v3
 
     - name: Build and override target environment
       uses: docker/build-push-action@v6
@@ -30,9 +27,10 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         load: true
-        # Vi overskriver standard-målet ved direkte at definere det som miljøvariabel i Docker-bygningen:
-        secrets: |
+        # Vi sender samle-flaget (All-In-One) og target direkte med som build-args:
+        build-args: |
           TARGET=t-deck-plus
+          CONFIG_RETRO_GO_BUILD_TYPE_ALL_IN_ONE=y
 
     - name: Extract binaries from docker image
       run: |
