@@ -1,29 +1,26 @@
-name: Retro-Go Build
+name: ci
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:      # Start a workflow
   push:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-    # 1. Frigør diskplads på GitHub runneren
+    # Remove ~18 GiB of preinstalled software to have more disk space during the build
     - name: Cleanup runner
       run: |
         df -h
         sudo rm -rf /opt/microsoft /usr/local/.ghcup /usr/local/julia* /usr/share/dotnet /usr/share/swift /usr/lib/llvm*
         df -h
-
-    # 2. Hent projektkoden
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # 3. Klargør Docker
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    # 4. Byg Docker image (samme grønne metode som før)
     - name: Build and override target environment
       uses: docker/build-push-action@v6
       with:
@@ -32,27 +29,14 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         load: true
+        # Vi overskriver standard-målet ved direkte at definere det som miljøvariabel i Docker-bygningen:
         secrets: |
           TARGET=t-deck-plus
-
-    # 5. Træk filerne ud og omdøb automatisk cores til .fw
-    - name: Extract binaries and convert cores to .fw
+    - name: Extract binaries from docker image
       run: |
         mkdir -p $(pwd)/build
         docker run --rm -v $(pwd)/build:/out retro-go:latest sh -c "find /app -name '*.bin' -exec cp {} /out/ \;"
-        
-        # Gå til build-mappen og konverter alle kerne-filer fra .bin til .fw
-        cd $(pwd)/build
-        for file in *.bin; do
-          if [ "$file" != "launcher.bin" ] && [ "$file" != "bootloader.bin" ] && [ "$file" != "partition-table.bin" ]; then
-            mv "$file" "${file%.bin}.fw"
-          fi
-        done
-        
-        echo "Færdige filer klar til SD-kort:"
         ls -la $(pwd)/build
-
-    # 6. Upload zip-filen med de klar-til-brug filer
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
