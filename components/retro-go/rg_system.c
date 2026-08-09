@@ -353,7 +353,7 @@ static void enter_recovery_mode(void)
 static void platform_init(void)
 {
 #if defined(ESP_PLATFORM)
-    // --- POWER ENABLE FOR T-DECK PERIPHERALS ---
+    // --- POWER ENABLE FOR T-DECK / T-DECK PLUS PERIPHERALS ---
     gpio_config_t pwr_conf = {
         .pin_bit_mask = (1ULL << GPIO_NUM_10) | (1ULL << GPIO_NUM_12),
         .mode = GPIO_MODE_OUTPUT,
@@ -364,8 +364,31 @@ static void platform_init(void)
     gpio_config(&pwr_conf);
     gpio_set_level(GPIO_NUM_10, 1);
     gpio_set_level(GPIO_NUM_12, 1);
-    // -------------------------------------------
-    
+
+    // --- AXP2101 PMU INIT (Tænder SD-kort + Periferi over I2C) ---
+    i2c_config_t i2c_conf = {
+        .mode = I2C_MODE_MASTER,
+        .sda_io_num = GPIO_NUM_18,
+        .sda_pullup_en = GPIO_PULLUP_ENABLE,
+        .scl_io_num = GPIO_NUM_8,
+        .scl_pullup_en = GPIO_PULLUP_ENABLE,
+        .master.clk_speed = 100000,
+    };
+    if (i2c_param_config(I2C_NUM_0, &i2c_conf) == ESP_OK &&
+        i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0) == ESP_OK)
+    {
+        // Tænd ALDO4 (SD Card Power) på AXP2101 PMU (I2C adresse 0x34)
+        i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+        i2c_master_start(cmd);
+        i2c_master_write_byte(cmd, (0x34 << 1) | I2C_MASTER_WRITE, true);
+        i2c_master_write_byte(cmd, 0x92, true); // ALDO4 Output Control Register
+        i2c_master_write_byte(cmd, 0x1C, true); // Sæt spænding til 3.3V
+        i2c_master_end(cmd);
+        i2c_master_cmd_begin(I2C_NUM_0, cmd, pdMS_TO_TICKS(100));
+        i2c_cmd_link_delete(cmd);
+    }
+    // -------------------------------------------------------------
+
     // At boot time those pins are muxed to JTAG and can interfere with other things.
     #if CONFIG_IDF_TARGET_ESP32
         gpio_reset_pin(GPIO_NUM_12);
@@ -373,8 +396,7 @@ static void platform_init(void)
         gpio_reset_pin(GPIO_NUM_14);
         gpio_reset_pin(GPIO_NUM_15);
     #endif
-    // Setup all SPI CS lines here in case we have a shared bus. A floating device could cause
-    // problems during the initialization of the first peripherals...
+    // Setup all SPI CS lines here in case we have a shared bus.
     #if defined(RG_SCREEN_HOST) && defined(RG_GPIO_LCD_CS)
         gpio_set_direction(RG_GPIO_LCD_CS, GPIO_MODE_OUTPUT);
         gpio_set_level(RG_GPIO_LCD_CS, 1);
