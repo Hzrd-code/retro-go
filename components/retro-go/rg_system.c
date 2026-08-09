@@ -19,6 +19,7 @@
 #include <esp_timer.h>
 #include <esp_sleep.h>
 #include <driver/gpio.h>
+#include <driver/i2c.h>
 #else
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_mutex.h>
