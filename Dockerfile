@@ -15,4 +15,4 @@ SHELL ["/bin/bash", "-c"]
 # Tving AIO-konfiguration i sdkconfig og kør det rene build
 RUN echo "CONFIG_RETRO_GO_BUILD_TYPE_ALL_IN_ONE=y" >> sdkconfig.defaults && \
     . /opt/esp/idf/export.sh && \
-    python rg_tool.py --target=t-deck-plus build-img all
+    python rg_tool.py --target=*** build-img all -- -j2
