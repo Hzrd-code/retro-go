@@ -94,15 +94,14 @@ static void ensure_tdeck_sd_power(void)
     i2c_param_config(I2C_NUM_0, &conf);
     i2c_driver_install(I2C_NUM_0, conf.mode, 0, 0, 0);
 
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+  i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
     i2c_master_write_byte(cmd, (0x34 << 1) | I2C_MASTER_WRITE, true);
     i2c_master_write_byte(cmd, 0x92, true); // ALDO4 Control Register
     i2c_master_write_byte(cmd, 0x1C, true); // 3.3V
-    i2c_master_end(cmd);
+    i2c_master_stop(cmd);
     i2c_master_cmd_begin(I2C_NUM_0, cmd, pdMS_TO_TICKS(100));
     i2c_cmd_link_delete(cmd);
-
     vTaskDelay(pdMS_TO_TICKS(150)); // Vent på at spændingen stabiliseres
 #endif
 }
