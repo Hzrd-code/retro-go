@@ -12,9 +12,8 @@ RUN cd /opt/esp/idf && \
 # Indstil bash shell
 SHELL ["/bin/bash", "-c"]
 
-# Tving AIO i target-konfigurationen og byg det samlede billede
-RUN echo "CONFIG_RETRO_GO_BUILD_TYPE_ALL_IN_ONE=y" >> targets/t-deck-plus/sdkconfig.defaults && \
-    . /opt/esp/idf/export.sh && \
-    python rg_tool.py --target=t-deck-plus build-img all && \
+# Byg AIO-billede til T-Deck Plus og saml bin-filerne
+RUN . /opt/esp/idf/export.sh && \
+    python rg_tool.py --target=t-deck-plus --config=CONFIG_RETRO_GO_BUILD_TYPE_ALL_IN_ONE=y build-img all && \
     mkdir -p /app/dist && \
-    cp releases/*.bin /app/dist/ 2>/dev/null || cp build/*.bin /app/dist/
+    cp releases/*.bin /app/dist/ 2>/dev/null || cp build/t-deck-plus/*.bin /app/dist/ 2>/dev/null || cp build/*.bin /app/dist/
