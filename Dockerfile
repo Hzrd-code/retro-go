@@ -12,11 +12,13 @@ RUN cd /opt/esp/idf && \
 # Indstil bash shell
 SHELL ["/bin/bash", "-c"]
 
-# Sæt build type til AIO og byg den samlede fil
+# 1. Byg projektet helt normalt
+# 2. Brug esptool til manuelt at sammensmelte alt til én stor AIO-fil
 RUN . /opt/esp/idf/export.sh && \
-    export RG_BUILD_TYPE=all-in-one && \
     python rg_tool.py --target=t-deck-plus build-img all && \
     mkdir -p /app/dist && \
-    (cp releases/*.bin /app/dist/ 2>/dev/null || true) && \
-    (cp build/*.bin /app/dist/ 2>/dev/null || true) && \
-    (cp build/t-deck-plus/*.bin /app/dist/ 2>/dev/null || true)
+    cd build && \
+    esptool.py --chip esp32s3 merge_bin -o /app/dist/retro-go-t-deck-plus-AIO.bin \
+      0x1000 bootloader.bin \
+      0x8000 partition-table.bin \
+      0x10000 launcher.bin
