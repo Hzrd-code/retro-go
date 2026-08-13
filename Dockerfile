@@ -12,8 +12,9 @@ RUN cd /opt/esp/idf && \
 # Indstil bash shell
 SHELL ["/bin/bash", "-c"]
 
-# Byg AIO-billede og kopiér alle genererede binaries til /app/dist
+# Sæt build type til AIO og byg den samlede fil
 RUN . /opt/esp/idf/export.sh && \
+    export RG_BUILD_TYPE=all-in-one && \
     python rg_tool.py --target=t-deck-plus build-img all && \
     mkdir -p /app/dist && \
     (cp releases/*.bin /app/dist/ 2>/dev/null || true) && \
