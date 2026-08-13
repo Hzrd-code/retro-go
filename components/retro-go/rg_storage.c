@@ -82,26 +82,6 @@ static void ensure_tdeck_sd_power(void)
     gpio_config(&pwr_conf);
     gpio_set_level(GPIO_NUM_10, 1);
 
-    // Tving AXP2101 PMU til at tænde 3.3V til SD-kort over I2C
-    i2c_config_t conf = {
-        .mode = I2C_MODE_MASTER,
-        .sda_io_num = 18,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_io_num = 8,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = 100000,
-    };
-    i2c_param_config(I2C_NUM_0, &conf);
-    i2c_driver_install(I2C_NUM_0, conf.mode, 0, 0, 0);
-
-  i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (0x34 << 1) | I2C_MASTER_WRITE, true);
-    i2c_master_write_byte(cmd, 0x92, true); // ALDO4 Control Register
-    i2c_master_write_byte(cmd, 0x1C, true); // 3.3V
-    i2c_master_stop(cmd);
-    i2c_master_cmd_begin(I2C_NUM_0, cmd, pdMS_TO_TICKS(100));
-    i2c_cmd_link_delete(cmd);
     vTaskDelay(pdMS_TO_TICKS(150)); // Vent på at spændingen stabiliseres
 #endif
 }
