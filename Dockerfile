@@ -17,9 +17,9 @@ RUN sed -i '/uint32_t rg_input_read_gamepad(void)/,/return gamepad_state;/c\uint
 RUN sed -i '1s/^/#include <driver\/i2c.h>\n/' /app/components/retro-go/rg_input.c
 # --------------------------------------------------
 
-# Byg alt og brug 'find' til at hente alle skjulte .bin filer
+# Byg alt og kopier alle bin-filer sikkert til /app/dist
 SHELL ["/bin/bash", "-c"]
 RUN . /opt/esp/idf/export.sh && \
 	python rg_tool.py --target=t-deck-plus release && \
 	mkdir -p /app/dist && \
-	find build releases -type f -name "*.bin" -exec cp {} /app/dist/ \;
+	find . -type f -name "*.bin" -exec cp {} /app/dist/ \;
