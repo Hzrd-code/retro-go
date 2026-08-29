@@ -1,27 +1,28 @@
 name: ci
 
 on:
-  workflow_dispatch:      # Start a workflow
+  workflow_dispatch:
   push:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
 
     steps:
-    # Remove ~18 GiB of preinstalled software to have more disk space during the build
-    - name: Cleanup runner
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Cleanup runner (free some disk)
       run: |
         df -h
         sudo rm -rf /opt/microsoft /usr/local/.ghcup /usr/local/julia* /usr/share/dotnet /usr/share/swift /usr/lib/llvm*
         df -h
-    - name: Checkout repository
-      uses: actions/checkout@v4
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: Build and override target environment
+    - name: Build Docker image (uses repo Dockerfile)
       uses: docker/build-push-action@v6
       with:
         context: .
@@ -29,15 +30,57 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         load: true
-        # Vi overskriver standard-målet ved direkte at definere det som miljøvariabel i Docker-bygningen:
-        secrets: |
+        build-args: |
           TARGET=t-deck-plus
+
     - name: Extract binaries from docker image
       run: |
-        mkdir -p $(pwd)/build
-        docker run --rm -v $(pwd)/build:/out retro-go:latest sh -c "find /app -name '*.bin' -exec cp {} /out/ \;"
-        ls -la $(pwd)/build
-    - name: Upload artifacts
+        mkdir -p "$(pwd)/build"
+        # Copy all .bin files created inside /app in the container into runner build/
+        docker run --rm -v "$(pwd)/build:/out" retro-go:latest sh -c "find /app -type f -name '*.bin' -exec cp {} /out/ \;"
+        ls -la "$(pwd)/build"
+
+    - name: Pack single .bin with mkfw.py (if not already present)
+      run: |
+        set -euo pipefail
+        mkdir -p build
+        if [ -f build/retro-go_t-deck-plus.bin ]; then
+          echo "Single packed image already present: build/retro-go_t-deck-plus.bin"
+          ls -lh build/retro-go_t-deck-plus.bin || true
+        else
+          echo "Packed image not found — assembling using tools/mkfw.py"
+          # Ensure required build files exist
+          if [ ! -f build/launcher.bin ]; then
+            echo "ERROR: launcher.bin not found in build/ — aborting"; ls -la build || exit 2
+          fi
+          if [ ! -f build/retro-core.bin ]; then
+            echo "ERROR: retro-core.bin not found in build/ — aborting"; ls -la build || exit 2
+          fi
+          # Derive version (fallback to 'unknown' if git describe fails)
+          VERSION=$(git describe --tags --abbrev=5 --dirty --always 2>/dev/null || echo unknown)
+          python3 tools/mkfw.py --type esp32s3 \
+            --bootloader build/bootloader.bin \
+            --name "Retro-Go" --icon assets/icon.raw --version "$VERSION" --target t-deck-plus \
+            build/retro-go_t-deck-plus.bin \
+            0 16 1048576 launcher build/launcher.bin \
+            0 16 1048576 retro-core build/retro-core.bin \
+            0 16 786432 prboom-go build/prboom-go.bin \
+            0 16 1048576 gwenesis build/gwenesis.bin \
+            0 16 589824 fmsx build/fmsx.bin
+          echo "Created build/retro-go_t-deck-plus.bin"
+          ls -lh build/retro-go_t-deck-plus.bin
+        fi
+
+    - name: Show resulting build files
+      run: ls -la build || true
+
+    - name: Upload single .bin artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: retro-go_t-deck-plus-bin
+        path: build/retro-go_t-deck-plus.bin
+
+    - name: Upload full binaries folder (debug)
       uses: actions/upload-artifact@v4
       with:
         name: binaries
